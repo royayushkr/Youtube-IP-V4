@@ -11,14 +11,53 @@ from googleapiclient.errors import HttpError
 # TEAM CONFIG (only edit these two blocks)
 # ============================================================
 
-CATEGORY_NAME = "tech"  #change accordingly
+CATEGORY_NAME = "research_science"
 
-CHANNEL_HANDLES = [ ] #add handles
+CHANNEL_HANDLES = [
+    "@veritasium",
+    "@3blue1brown",
+    "@AsapSCIENCE",
+    "@SciShow",
+    "@PBSSpaceTime",
+    "@Seeker",
+    "@NileRed",
+    "@NileBlue",
+    "@smartereveryday",
+    "@RealEngineering",
+    "@PracticalEngineeringChannel",
+    "@numberphile",
+    "@Computerphile",
+    "@minutephysics",
+    "@standupmaths",
+    "@SteveMould",
+    "@physicsgirl",
+    "@SabineHossenfelder",
+    "@DomainofScience",
+    "@journeytomicro",
+    "@kurzgesagt",
+    "@ben_eater",
+    "@ArvinAsh",
+    "@statquest",
+    "@TwoMinutePapers",
+    "@AstrumSpace",
+    "@fermilab",
+    "@SixtySymbols",
+    "@periodicvideos",
+    "@DrBenMiles",
+    "@medlifecrisis",
+    "@sciencephiletheai",
+    "@AlphaPhoenixChannel",
+    "@CoolWorldsLab",
+    "@CleoAbram",
+    "@DrBecky",
+    "@acollierastro",
+    "@zackdfilms",
+    "@PrimerBlobs",
+    "@BobbyBroccoli",
+]
 
-
-
-CHANNELS_TARGET = 30
-VIDEOS_PER_CHANNEL = 50
+CHANNELS_TARGET = 40
+VIDEOS_PER_CHANNEL = 120
 
 OUTPUT_CSV = os.path.join("scripts", f"{CATEGORY_NAME}_channels_videos.csv")
 
