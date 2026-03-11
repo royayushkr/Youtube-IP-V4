@@ -226,113 +226,103 @@ def _inject_ytuber_css() -> None:
     st.markdown(
         """
         <style>
-        .ytuber-hero {
-            max-width: 1180px;
-            margin: 0 auto 1.15rem;
-        }
-        .ytuber-hero-card {
-            border-radius: 28px;
-            padding: 1.4rem 1.45rem;
+        [data-testid="stAppViewContainer"] {
             background:
-                radial-gradient(circle at top right, rgba(0, 212, 255, 0.12), transparent 34%),
-                radial-gradient(circle at bottom left, rgba(255, 0, 0, 0.10), transparent 30%),
-                linear-gradient(180deg, rgba(19,25,48,0.95) 0%, rgba(12,16,34,0.98) 100%);
-            border: 1px solid rgba(255,255,255,0.10);
-            box-shadow: 0 24px 60px rgba(0,0,0,0.28);
+                radial-gradient(circle at top center, rgba(63, 85, 127, 0.42) 0%, transparent 24%),
+                radial-gradient(circle at top left, rgba(173, 34, 34, 0.16) 0%, transparent 16%),
+                linear-gradient(180deg, #2A3446 0%, #1C2433 44%, #121A27 100%) !important;
+        }
+        [data-testid="stAppViewBlockContainer"] {
+            max-width: 1240px !important;
+            padding-top: 1.35rem !important;
+        }
+        .ytuber-hero {
+            max-width: 860px;
+            margin: 0 auto 1rem;
+            text-align: center;
         }
         .ytuber-brand-row {
             display: inline-flex;
             align-items: center;
             gap: 0.55rem;
-            padding: 0.45rem 0.7rem;
+            padding: 0.42rem 0.78rem;
             border-radius: 999px;
-            background: rgba(255,255,255,0.06);
-            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
             color: #FFFFFF;
             font-size: 12px;
             letter-spacing: 0.10em;
             text-transform: uppercase;
-            margin-bottom: 0.9rem;
+            margin-bottom: 0.75rem;
         }
         .ytuber-brand-dot {
             width: 8px;
             height: 8px;
             border-radius: 999px;
-            background: linear-gradient(180deg, #00D4FF, #FF3B30);
-            box-shadow: 0 0 18px rgba(0, 212, 255, 0.65);
+            background: linear-gradient(180deg, #FF5A5F, #FF2D2D);
+            box-shadow: 0 0 16px rgba(255, 90, 95, 0.55);
         }
         .ytuber-kicker {
             font-size: 12px;
-            letter-spacing: 0.18em;
+            letter-spacing: 0.16em;
             text-transform: uppercase;
-            color: #90A0CA;
-            margin-bottom: 0.55rem;
+            color: #94A3C7;
+            margin-bottom: 0.5rem;
         }
         .ytuber-title {
-            font-size: clamp(34px, 4.2vw, 56px);
+            font-size: clamp(32px, 4vw, 50px);
             line-height: 1.02;
             font-weight: 800;
             color: #FFFFFF;
-            max-width: 720px;
-            margin-bottom: 0.8rem;
+            max-width: 760px;
+            margin: 0 auto 0.7rem;
         }
         .ytuber-subtitle {
-            font-size: 16px;
-            color: #C0C9E4;
-            max-width: 650px;
+            font-size: 15px;
+            color: #C5CEE6;
+            max-width: 680px;
+            margin: 0 auto;
         }
-        .ytuber-feature-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.65rem;
-            margin-top: 1rem;
-        }
-        .ytuber-feature-pill {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.55rem 0.8rem;
-            border-radius: 999px;
-            background: rgba(255,255,255,0.075);
-            border: 1px solid rgba(255,255,255,0.10);
-            color: #E8EBF8;
+        .ytuber-search-meta {
+            margin-top: 0.9rem;
             font-size: 13px;
-        }
-        .ytuber-command-card {
-            padding: 1.2rem 1.2rem 1rem;
-            border-radius: 28px;
-            background:
-                radial-gradient(circle at top left, rgba(0, 212, 255, 0.10), transparent 36%),
-                linear-gradient(180deg, rgba(24,31,60,0.96) 0%, rgba(15,19,40,0.98) 100%);
-            border: 1px solid rgba(255,255,255,0.11);
-            box-shadow: 0 20px 50px rgba(0,0,0,0.22);
+            color: #AEB8D6;
         }
         .ytuber-command-title {
-            font-size: 24px;
+            font-size: 18px;
             color: #FFFFFF;
             font-weight: 700;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.2rem;
+            text-align: center;
         }
         .ytuber-command-subtitle {
-            font-size: 14px;
-            color: #B7C1DD;
-            margin-bottom: 0.95rem;
+            font-size: 13px;
+            color: #AEB8D6;
+            margin-bottom: 0.85rem;
+            text-align: center;
         }
-        .ytuber-detected {
+        .ytuber-toolbar-note {
             font-size: 12px;
-            color: #B7C1DD;
+            color: #AEB8D6;
             margin-top: 0.45rem;
+            text-align: left;
+        }
+        .ytuber-empty-copy {
+            text-align: center;
+            color: #AEB8D6;
+            font-size: 13px;
+            margin: 0.6rem 0 0.2rem;
         }
         .ytuber-banner {
-            border-radius: 22px;
-            padding: 1rem 1.1rem;
+            border-radius: 20px;
+            padding: 0.95rem 1rem;
             margin-bottom: 1rem;
-            background:
-                radial-gradient(circle at top left, rgba(255,255,255,0.08) 0%, rgba(27,39,72,0.96) 44%, rgba(9,13,28,0.98) 100%);
-            border: 1px solid rgba(255,255,255,0.11);
-            box-shadow: 0 16px 40px rgba(0,0,0,0.22);
+            background: linear-gradient(180deg, rgba(45,58,86,0.92) 0%, rgba(29,38,57,0.96) 100%);
+            border: 1px solid rgba(255,255,255,0.10);
+            box-shadow: 0 14px 32px rgba(7, 12, 21, 0.25);
         }
         .ytuber-banner-title {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 700;
             color: #FFFFFF;
             margin-bottom: 0.25rem;
@@ -340,6 +330,98 @@ def _inject_ytuber_css() -> None:
         .ytuber-banner-meta {
             font-size: 13px;
             color: #B7C1DD;
+        }
+        .ytuber-section-surface {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 22px;
+            padding: 1rem 1rem 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .yt-section-header {
+            font-size: 20px !important;
+            margin-top: 1.1rem !important;
+            margin-bottom: 0.45rem !important;
+        }
+        .yt-section-underline {
+            display: none !important;
+        }
+        .yt-card,
+        .metric-card {
+            background: linear-gradient(180deg, rgba(41, 52, 73, 0.95) 0%, rgba(28, 37, 55, 0.98) 100%) !important;
+            border: 1px solid rgba(255,255,255,0.09) !important;
+            box-shadow: 0 14px 30px rgba(8, 12, 20, 0.30) !important;
+        }
+        .keyword-chip {
+            background: linear-gradient(90deg, rgba(255, 61, 54, 0.20), rgba(80, 100, 152, 0.22)) !important;
+            border: 1px solid rgba(255,255,255,0.14) !important;
+        }
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 0.45rem;
+            border-bottom: none !important;
+            background: rgba(255,255,255,0.04);
+            padding: 0.35rem;
+            border-radius: 999px;
+            margin-bottom: 0.85rem;
+        }
+        .stTabs [data-baseweb="tab-highlight"] {
+            display: none;
+        }
+        .stTabs [data-baseweb="tab"] {
+            height: auto;
+            border-radius: 999px;
+            padding: 0.42rem 0.95rem;
+            color: #C5CEE6;
+            border: 1px solid transparent;
+        }
+        .stTabs [aria-selected="true"] {
+            background: rgba(255, 59, 48, 0.16) !important;
+            border-color: rgba(255, 59, 48, 0.38) !important;
+        }
+        .stTabs [aria-selected="true"] p {
+            color: #FFFFFF !important;
+            font-weight: 600 !important;
+        }
+        .stButton > button {
+            background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03)) !important;
+            border: 1px solid rgba(255,255,255,0.14) !important;
+            color: #FFFFFF !important;
+            box-shadow: none !important;
+        }
+        .stButton > button:hover {
+            background: linear-gradient(180deg, rgba(255,255,255,0.11), rgba(255,255,255,0.05)) !important;
+            border-color: rgba(255,255,255,0.24) !important;
+            transform: translateY(-1px);
+        }
+        button[kind="primary"] {
+            background: linear-gradient(90deg, #FF3B30, #D90429) !important;
+            border-color: rgba(255, 92, 92, 0.40) !important;
+            box-shadow: 0 12px 24px rgba(191, 24, 24, 0.32) !important;
+        }
+        button[kind="primary"]:hover {
+            background: linear-gradient(90deg, #FF554A, #EB1D43) !important;
+            border-color: rgba(255, 120, 120, 0.48) !important;
+        }
+        .stTextInput > div > div > input,
+        .stTextArea textarea,
+        .stSelectbox > div > div,
+        .stDateInput > div > div,
+        .stMultiSelect > div > div {
+            background-color: rgba(38, 48, 71, 0.92) !important;
+            border: 1px solid rgba(255,255,255,0.12) !important;
+        }
+        .stTextInput > div > div > input {
+            min-height: 3.2rem !important;
+            border-radius: 999px !important;
+        }
+        [data-testid="stToggle"] label p,
+        [data-testid="stToggle"] small {
+            color: #C5CEE6 !important;
+        }
+        @media (max-width: 900px) {
+            .ytuber-title {
+                font-size: 34px;
+            }
         }
         </style>
         """,
@@ -1831,23 +1913,16 @@ def _render_ai_studio(
     keyword_hints: List[str],
 ) -> None:
     section_header("AI Studio", icon="🤖")
-    st.markdown('<div class="yt-card">', unsafe_allow_html=True)
 
-    gemini_count = get_provider_key_count("gemini")
-    openai_count = get_provider_key_count("openai")
     available_text_providers = [
         provider for provider in ["gemini", "openai"] if get_provider_key_count(provider) > 0
     ]
     available_image_providers = available_text_providers[:]
 
-    st.caption(
-        f"Provider pools: Gemini `{gemini_count}` key(s) • OpenAI `{openai_count}` key(s). "
-        "Generation uses the configured secret pools automatically."
-    )
+    st.caption("Choose the model mix, output counts, and creative filters before generating text or thumbnails.")
 
     if not available_text_providers and not available_image_providers:
         st.info("Add `GEMINI_API_KEYS` and/or `OPENAI_API_KEYS` in secrets to unlock AI Studio.")
-        st.markdown("</div>", unsafe_allow_html=True)
         return
 
     if "ytuber_ai_task" not in st.session_state or st.session_state["ytuber_ai_task"] not in AI_STUDIO_TASKS:
@@ -2109,7 +2184,7 @@ def _render_ai_studio(
                     f"""
                     <div class="yt-card" style="margin-top:0.8rem;">
                         <div style="font-size:13px;color:#B0B0B0;margin-bottom:0.35rem;">AI Output</div>
-                        <pre style="white-space:pre-wrap;font-size:13px;color:#FFFFFF;background:rgba(5,5,15,0.95);padding:0.75rem;border-radius:10px;border:1px solid rgba(255,255,255,0.12);max-height:520px;overflow:auto;">{output}</pre>
+                        <pre style="white-space:pre-wrap;font-size:13px;color:#FFFFFF;background:rgba(20,27,41,0.95);padding:0.75rem;border-radius:10px;border:1px solid rgba(255,255,255,0.12);max-height:520px;overflow:auto;">{output}</pre>
                     </div>
                     """,
                     unsafe_allow_html=True,
@@ -2156,15 +2231,13 @@ def _render_ai_studio(
                 out_dir = os.path.join("outputs", "thumbnails")
                 os.makedirs(out_dir, exist_ok=True)
                 ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-
-                st.markdown('<div class="thumb-grid">', unsafe_allow_html=True)
+                thumb_cols = st.columns(min(len(images), 3) or 1)
                 for idx, generated in enumerate(images, start=1):
                     ext = "png" if "png" in generated.mime_type else "jpg"
                     filename = f"ytuber_{channel_id}_{ts}_{idx}.{ext}"
                     with open(os.path.join(out_dir, filename), "wb") as fp:
                         fp.write(generated.image_bytes)
-                    with st.container():
-                        st.markdown('<div class="thumb-card">', unsafe_allow_html=True)
+                    with thumb_cols[(idx - 1) % len(thumb_cols)]:
                         st.image(generated.image_bytes, use_container_width=True)
                         st.download_button(
                             label="Download",
@@ -2174,11 +2247,8 @@ def _render_ai_studio(
                             use_container_width=True,
                             key=f"ytuber_thumb_{idx}_{ts}",
                         )
-                        st.markdown("</div>", unsafe_allow_html=True)
-                st.markdown("</div>", unsafe_allow_html=True)
             except Exception as exc:
                 st.error(f"Thumbnail generation failed: {exc}")
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render() -> None:
@@ -2196,77 +2266,70 @@ def render() -> None:
         "openai": get_provider_key_count("openai"),
     }
 
-    hero_left, hero_right = st.columns([1.15, 0.95], gap="large")
-    with hero_left:
-        st.markdown(
-            """
-            <div class="ytuber-hero">
-                <div class="ytuber-hero-card">
-                    <div class="ytuber-brand-row">
-                        <span class="ytuber-brand-dot"></span>
-                        YouTube IP V3
-                    </div>
-                    <div class="ytuber-kicker">Creator intelligence workspace</div>
-                    <div class="ytuber-title">One place for channel audits, benchmark analysis, planning, and AI production support.</div>
-                    <div class="ytuber-subtitle">
-                        Load any channel, review what is working, compare it against competitors,
-                        and turn the findings into ideas, scripts, and thumbnails.
-                    </div>
-                    <div class="ytuber-feature-row">
-                        <span class="ytuber-feature-pill">Live benchmarking</span>
-                        <span class="ytuber-feature-pill">AI Studio first</span>
-                        <span class="ytuber-feature-pill">Proof-based planner</span>
-                    </div>
-                </div>
+    st.markdown(
+        """
+        <div class="ytuber-hero">
+            <div class="ytuber-brand-row">
+                <span class="ytuber-brand-dot"></span>
+                YouTube IP V3
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+            <div class="ytuber-kicker">YouTube search and creator intelligence</div>
+            <div class="ytuber-title">Search any YouTube channel and open a live growth workspace.</div>
+            <div class="ytuber-subtitle">
+                Pull recent channel performance, compare it against competitors, and turn the same live data
+                into ideas, scripts, thumbnails, and publishing decisions.
+            </div>
+            <div class="ytuber-search-meta">One search input. Live channel sync. AI Studio first.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    with hero_right:
-        st.markdown('<div class="ytuber-command-card">', unsafe_allow_html=True)
+    _, search_col, _ = st.columns([1, 3.8, 1])
+    with search_col:
         st.markdown(
             """
             <div class="ytuber-command-title">Start with a channel</div>
             <div class="ytuber-command-subtitle">
-                Enter a handle, channel name, or channel ID to open the live workspace.
+                Search by handle, channel name, or channel ID to launch the workspace.
             </div>
             """,
             unsafe_allow_html=True,
         )
-        growth_prompt = st.text_input(
-            "Channel",
-            key="ytuber_growth_prompt",
-            placeholder="@veritasium",
-            label_visibility="collapsed",
-        )
+        input_cols = st.columns([4.2, 1.45], gap="small")
+        with input_cols[0]:
+            growth_prompt = st.text_input(
+                "Channel",
+                key="ytuber_growth_prompt",
+                placeholder="Search YouTube by @handle, channel name, or UC channel ID",
+                label_visibility="collapsed",
+            )
+        with input_cols[1]:
+            analyze = st.button(
+                "Open Workspace",
+                type="primary",
+                use_container_width=True,
+                disabled=provider_counts["youtube"] <= 0,
+            )
         detected_channel = _extract_channel_query(growth_prompt)
-        if detected_channel:
-            st.markdown(
-                f"<div class='ytuber-detected'>Channel target: <code>{escape(detected_channel)}</code></div>",
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                "<div class='ytuber-detected'>Paste a channel handle, name, or channel ID.</div>",
-                unsafe_allow_html=True,
-            )
-
-        control_cols = st.columns([0.9, 1.3])
-        with control_cols[0]:
+        meta_cols = st.columns([1.2, 2.1], gap="medium")
+        with meta_cols[0]:
             force_refresh = st.toggle(
                 "Force live refresh",
                 key="ytuber_force_refresh",
                 help="Bypass cached rows and pull the last year from the YouTube API again.",
             )
-        with control_cols[1]:
-            analyze = st.button(
-                "Load Live Workspace",
-                type="primary",
-                use_container_width=True,
-                disabled=provider_counts["youtube"] <= 0,
-            )
-        st.markdown("</div>", unsafe_allow_html=True)
+        with meta_cols[1]:
+            if detected_channel:
+                st.markdown(
+                    f"<div class='ytuber-toolbar-note'>Ready to search <code>{escape(detected_channel)}</code></div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    "<div class='ytuber-toolbar-note'>Use a handle like <code>@veritasium</code> or paste a channel ID.</div>",
+                    unsafe_allow_html=True,
+                )
 
     if provider_counts["youtube"] <= 0:
         st.warning(
@@ -2297,7 +2360,10 @@ def render() -> None:
         st.session_state.pop("ytuber_creative_brief", None)
 
     if "ytuber_channel_df" not in st.session_state:
-        st.info("Load a channel to unlock the full Ytuber suite.")
+        st.markdown(
+            "<div class='ytuber-empty-copy'>Search a channel above to unlock AI Studio, audit, benchmarking, and planning.</div>",
+            unsafe_allow_html=True,
+        )
         _render_pool_footer(provider_counts)
         return
 
