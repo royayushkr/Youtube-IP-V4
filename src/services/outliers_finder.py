@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import timezone
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import pandas as pd
@@ -13,6 +14,19 @@ from src.utils.api_keys import run_with_provider_keys
 
 
 YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3"
+OUTLIER_CACHE_TTL_SECONDS = 3600
+BASELINE_CACHE_TTL_SECONDS = 21600
+AGE_BUCKET_ORDER = ["0-2d", "3-7d", "8-30d", "31-90d", "90d+"]
+DURATION_BUCKET_ORDER = ["Shorts (<=60s)", "1-4 min", "4-12 min", "12-30 min", "30+ min", "Unknown"]
+TITLE_PATTERN_ORDER = [
+    "How / Why",
+    "Numbered",
+    "Challenge / Test",
+    "Explainer",
+    "Versus",
+    "News / Update",
+    "General",
+]
 SUBSCRIBER_BUCKETS: Dict[str, Tuple[Optional[int], Optional[int]]] = {
     "Any": (None, None),
     "0 - 10K": (0, 10_000),
@@ -20,8 +34,29 @@ SUBSCRIBER_BUCKETS: Dict[str, Tuple[Optional[int], Optional[int]]] = {
     "100K - 1M": (100_000, 1_000_000),
     "1M+": (1_000_000, None),
 }
-OUTLIER_CACHE_TTL_SECONDS = 3600
-BASELINE_CACHE_TTL_SECONDS = 21600
+DURATION_BUCKETS: Dict[str, Tuple[Optional[int], Optional[int]]] = {
+    "Any": (None, None),
+    "Shorts (<=60s)": (0, 60),
+    "1-4 min": (61, 4 * 60),
+    "4-12 min": (4 * 60 + 1, 12 * 60),
+    "12-30 min": (12 * 60 + 1, 30 * 60),
+    "30+ min": (30 * 60 + 1, None),
+}
+LANGUAGE_THRESHOLD_MAP = {
+    "strict": 0.72,
+    "balanced": 0.45,
+    "loose": 0.20,
+}
+LATIN_LANGUAGES = {"en", "es", "pt", "de", "fr"}
+NON_LATIN_PATTERNS = {
+    "hi": re.compile(r"[\u0900-\u097F]"),
+    "ja": re.compile(r"[\u3040-\u30FF\u31F0-\u31FF\u4E00-\u9FFF]"),
+}
+STOPWORDS = {
+    "the", "a", "an", "to", "of", "in", "for", "with", "on", "and", "or", "at", "is",
+    "are", "was", "were", "this", "that", "how", "why", "what", "when", "from", "your",
+    "you", "my", "we", "our", "it", "vs", "into", "their", "about", "using", "over",
+}
 
 
 @dataclass(frozen=True)
@@ -31,8 +66,16 @@ class OutlierSearchRequest:
     published_before_iso: str
     region_code: str = ""
     relevance_language: str = ""
+    language_strictness: str = "strict"
     subscriber_bucket: str = "Any"
     include_hidden_subscribers: bool = True
+    min_subscribers: Optional[int] = None
+    max_subscribers: Optional[int] = None
+    min_views: int = 0
+    duration_preference: str = "Any"
+    freshness_days: Optional[int] = None
+    exclude_keywords: Tuple[str, ...] = tuple()
+    match_mode: str = "broad"
     max_results: int = 100
     baseline_channel_limit: int = 15
     baseline_video_cap: int = 20
@@ -72,6 +115,11 @@ class OutlierCandidate:
     channel_country: str
     channel_default_language: str
     video_default_language: str
+    language_confidence: float
+    language_confidence_label: str
+    duration_seconds: int
+    duration_bucket: str
+    title_pattern: str
     outlier_score: float
     peer_percentile: float
     engagement_percentile: float
@@ -82,9 +130,8 @@ class OutlierCandidate:
     baseline_engagement_ratio: Optional[float]
     size_bucket: str
     age_bucket: str
-    explanation_1: str
-    explanation_2: str
-    explanation_3: str
+    why_outlier: str
+    research_cue: str
 
 
 @dataclass(frozen=True)
@@ -103,9 +150,7 @@ class OutlierSearchResult:
         if not rows:
             return pd.DataFrame()
         frame = pd.DataFrame(rows)
-        frame["explanation_text"] = frame[
-            ["explanation_1", "explanation_2", "explanation_3"]
-        ].apply(
+        frame["explanation_text"] = frame[["why_outlier", "research_cue"]].apply(
             lambda row: " | ".join(str(value) for value in row if str(value).strip()),
             axis=1,
         )
@@ -140,6 +185,11 @@ def _coerce_float(value: Any) -> Optional[float]:
         return float(value)
     except Exception:
         return None
+
+
+def _normalize_language_code(value: str) -> str:
+    text = str(value or "").strip().lower().replace("_", "-")
+    return text.split("-", 1)[0] if text else ""
 
 
 def _parse_timestamp(value: str) -> pd.Timestamp:
@@ -179,6 +229,33 @@ def _bucket_for_subscribers(subscribers: Optional[int], hidden: bool) -> str:
     return "1M+"
 
 
+def _parse_iso_duration_seconds(duration: str) -> int:
+    if not isinstance(duration, str):
+        return 0
+    match = re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", duration)
+    if not match:
+        return 0
+    hours = int(match.group(1) or 0)
+    minutes = int(match.group(2) or 0)
+    seconds = int(match.group(3) or 0)
+    return hours * 3600 + minutes * 60 + seconds
+
+
+def _duration_bucket_for_seconds(duration_seconds: int) -> str:
+    if duration_seconds <= 0:
+        return "Unknown"
+    for label, (minimum, maximum) in DURATION_BUCKETS.items():
+        if label == "Any":
+            continue
+        lower_bound = minimum or 0
+        if duration_seconds < lower_bound:
+            continue
+        if maximum is not None and duration_seconds > maximum:
+            continue
+        return label
+    return "30+ min"
+
+
 def _weighted_average(values: Iterable[Tuple[Optional[float], float]]) -> Optional[float]:
     numerator = 0.0
     denominator = 0.0
@@ -203,6 +280,117 @@ def _percentile(values: pd.Series) -> pd.Series:
     if values.empty:
         return values
     return values.rank(pct=True, method="average").clip(0.0, 1.0)
+
+
+def _title_tokens(text: str) -> List[str]:
+    tokens = re.findall(r"[A-Za-z0-9]+", str(text or "").lower())
+    return [token for token in tokens if len(token) > 2 and token not in STOPWORDS]
+
+
+def _title_pattern(title: str) -> str:
+    lower = str(title or "").lower()
+    stripped = lower.strip()
+    if re.search(r"\bhow\b|\bwhy\b", stripped):
+        return "How / Why"
+    if re.search(r"\b\d+\b", stripped):
+        return "Numbered"
+    if " vs " in stripped or " versus " in stripped:
+        return "Versus"
+    if any(token in stripped for token in ("challenge", "test", "experiment", "trying")):
+        return "Challenge / Test"
+    if any(token in stripped for token in ("explained", "guide", "breakdown", "tutorial")):
+        return "Explainer"
+    if any(token in stripped for token in ("news", "update", "announced", "just happened")):
+        return "News / Update"
+    return "General"
+
+
+def _title_script_confidence(title: str, language_code: str) -> float:
+    target = _normalize_language_code(language_code)
+    text = str(title or "")
+    if not text or not target:
+        return 0.0
+
+    if target in NON_LATIN_PATTERNS:
+        return 1.0 if NON_LATIN_PATTERNS[target].search(text) else 0.0
+
+    if target in LATIN_LANGUAGES:
+        latin_chars = len(re.findall(r"[A-Za-z]", text))
+        total_letters = len(re.findall(r"[A-Za-z\u00C0-\u024F]", text))
+        if total_letters <= 0:
+            return 0.0
+        return min(1.0, latin_chars / total_letters + 0.20)
+
+    return 0.0
+
+
+def _language_confidence(
+    title: str,
+    video_default_language: str,
+    channel_default_language: str,
+    target_language: str,
+) -> float:
+    target = _normalize_language_code(target_language)
+    if not target:
+        return 1.0
+
+    video_lang = _normalize_language_code(video_default_language)
+    channel_lang = _normalize_language_code(channel_default_language)
+    score = 0.0
+
+    if video_lang == target:
+        score += 0.55
+    elif video_lang and video_lang != target:
+        score -= 0.20
+
+    if channel_lang == target:
+        score += 0.20
+    elif channel_lang and channel_lang != target:
+        score -= 0.08
+
+    score += _title_script_confidence(title, target) * 0.25
+
+    if target == "en" and not video_lang and not channel_lang:
+        if re.search(r"[\u0900-\u097F\u3040-\u30FF\u31F0-\u31FF\u4E00-\u9FFF]", title):
+            score -= 0.35
+
+    return max(0.0, min(score, 1.0))
+
+
+def _confidence_label(score: float) -> str:
+    if score >= 0.72:
+        return "High"
+    if score >= 0.45:
+        return "Medium"
+    return "Low"
+
+
+def _language_threshold(strictness: str) -> float:
+    return LANGUAGE_THRESHOLD_MAP.get(str(strictness or "").strip().lower(), 0.45)
+
+
+def _query_string_for_request(request: OutlierSearchRequest) -> str:
+    query = request.niche_query.strip()
+    if request.match_mode.lower() == "exact":
+        query = f'"{query}"'
+    for keyword in request.exclude_keywords:
+        text = str(keyword).strip()
+        if not text:
+            continue
+        query += f' -"{text}"' if " " in text else f" -{text}"
+    return query
+
+
+def _matches_query_mode(title: str, description: str, request: OutlierSearchRequest) -> bool:
+    if request.match_mode.lower() != "exact":
+        return True
+    haystack = f"{title} {description}".lower()
+    return request.niche_query.strip().lower() in haystack
+
+
+def _contains_excluded_keyword(title: str, description: str, exclude_keywords: Sequence[str]) -> bool:
+    haystack = f"{title} {description}".lower()
+    return any(str(keyword).strip().lower() in haystack for keyword in exclude_keywords if str(keyword).strip())
 
 
 def _is_youtube_retryable_error(exc: Exception) -> bool:
@@ -251,7 +439,7 @@ def _search_video_ids(api_key: str, request: OutlierSearchRequest) -> List[str]:
             "search",
             {
                 "part": "snippet",
-                "q": request.niche_query,
+                "q": _query_string_for_request(request),
                 "type": "video",
                 "order": "date",
                 "publishedAfter": request.published_after_iso,
@@ -341,6 +529,43 @@ def _filter_subscriber_bucket(
     return frame[mask].copy()
 
 
+def _apply_request_filters(frame: pd.DataFrame, request: OutlierSearchRequest) -> pd.DataFrame:
+    if frame.empty:
+        return frame
+
+    out = _filter_subscriber_bucket(
+        frame,
+        request.subscriber_bucket,
+        request.include_hidden_subscribers,
+    )
+    if out.empty:
+        return out
+
+    if request.min_subscribers is not None:
+        out = out[
+            out["channel_subscriber_count"].fillna(-1) >= int(request.min_subscribers)
+        ]
+    if request.max_subscribers is not None:
+        out = out[
+            out["channel_subscriber_count"].fillna(float("inf")) <= int(request.max_subscribers)
+        ]
+    if request.min_views > 0:
+        out = out[out["views"] >= int(request.min_views)]
+    if request.freshness_days is not None:
+        out = out[out["age_days"] <= float(request.freshness_days)]
+    if request.duration_preference != "Any":
+        out = out[out["duration_bucket"] == request.duration_preference]
+    if request.match_mode.lower() == "exact":
+        out = out[out["exact_match"].fillna(False)]
+    if request.exclude_keywords:
+        out = out[~out["excluded_keyword_hit"].fillna(False)]
+    if request.relevance_language:
+        threshold = _language_threshold(request.language_strictness)
+        out = out[out["language_confidence"] >= threshold]
+
+    return out.copy()
+
+
 def _build_candidate_frame(
     videos: Sequence[Dict[str, Any]],
     channels: Mapping[str, Dict[str, Any]],
@@ -353,6 +578,7 @@ def _build_candidate_frame(
     for video in videos:
         snippet = video.get("snippet", {}) or {}
         stats = video.get("statistics", {}) or {}
+        content = video.get("contentDetails", {}) or {}
         channel_id = str(snippet.get("channelId", "")).strip()
         if not channel_id or channel_id not in channels:
             continue
@@ -372,6 +598,18 @@ def _build_candidate_frame(
         views = _coerce_int(stats.get("viewCount")) or 0
         likes = _coerce_int(stats.get("likeCount")) or 0
         comments = _coerce_int(stats.get("commentCount")) or 0
+        duration_seconds = _parse_iso_duration_seconds(str(content.get("duration", "")))
+
+        title = str(snippet.get("title", "")).strip()
+        description = str(snippet.get("description", "")).strip()
+        video_lang = str(snippet.get("defaultLanguage") or snippet.get("defaultAudioLanguage") or "").strip()
+        channel_lang = str(channel_branding.get("defaultLanguage", "")).strip()
+        language_confidence = _language_confidence(
+            title=title,
+            video_default_language=video_lang,
+            channel_default_language=channel_lang,
+            target_language=request.relevance_language,
+        )
 
         age_hours = _age_hours_from_timestamp(published_at)
         age_days = age_hours / 24.0
@@ -393,7 +631,8 @@ def _build_candidate_frame(
         rows.append(
             {
                 "video_id": str(video.get("id", "")).strip(),
-                "video_title": str(snippet.get("title", "")).strip(),
+                "video_title": title,
+                "video_description": description,
                 "channel_id": channel_id,
                 "channel_title": str(snippet.get("channelTitle", "")).strip()
                 or str(_safe_get(channel, ["snippet", "title"], "")).strip(),
@@ -411,8 +650,19 @@ def _build_candidate_frame(
                 "channel_subscriber_count": subscribers,
                 "hidden_subscriber_count": hidden_subscribers,
                 "channel_country": str(channel_branding.get("country", "")).strip(),
-                "channel_default_language": str(channel_branding.get("defaultLanguage", "")).strip(),
-                "video_default_language": str(snippet.get("defaultLanguage") or snippet.get("defaultAudioLanguage") or "").strip(),
+                "channel_default_language": channel_lang,
+                "video_default_language": video_lang,
+                "language_confidence": language_confidence,
+                "language_confidence_label": _confidence_label(language_confidence),
+                "duration_seconds": duration_seconds,
+                "duration_bucket": _duration_bucket_for_seconds(duration_seconds),
+                "title_pattern": _title_pattern(title),
+                "exact_match": _matches_query_mode(title, description, request),
+                "excluded_keyword_hit": _contains_excluded_keyword(
+                    title,
+                    description,
+                    request.exclude_keywords,
+                ),
             }
         )
 
@@ -420,11 +670,7 @@ def _build_candidate_frame(
     if frame.empty:
         return frame
 
-    frame = _filter_subscriber_bucket(
-        frame,
-        request.subscriber_bucket,
-        request.include_hidden_subscribers,
-    )
+    frame = _apply_request_filters(frame, request)
     if frame.empty:
         return frame
 
@@ -435,7 +681,21 @@ def _build_candidate_frame(
         ),
         axis=1,
     )
-    frame["age_bucket"] = frame["age_days"].apply(_bucket_for_age)
+    frame["age_bucket"] = pd.Categorical(
+        frame["age_days"].apply(_bucket_for_age),
+        categories=AGE_BUCKET_ORDER,
+        ordered=True,
+    )
+    frame["duration_bucket"] = pd.Categorical(
+        frame["duration_bucket"],
+        categories=DURATION_BUCKET_ORDER,
+        ordered=True,
+    )
+    frame["title_pattern"] = pd.Categorical(
+        frame["title_pattern"],
+        categories=TITLE_PATTERN_ORDER,
+        ordered=True,
+    )
     return frame
 
 
@@ -445,20 +705,18 @@ def _prepare_peer_percentiles(frame: pd.DataFrame) -> pd.DataFrame:
 
     out = frame.copy()
     out["views_per_day_log"] = out["views_per_day"].fillna(0).apply(lambda value: math.log1p(max(value, 0)))
-    out["views_per_subscriber_filled"] = out["views_per_subscriber"].fillna(0.5)
+    out["views_per_subscriber_filled"] = out["views_per_subscriber"].fillna(0.40)
     out["views_per_subscriber_log"] = out["views_per_subscriber_filled"].apply(
         lambda value: math.log1p(max(value, 0))
     )
 
     detailed_group_counts = (
-        out.groupby(["size_bucket", "age_bucket"], dropna=False)["video_id"]
+        out.groupby(["size_bucket", "age_bucket"], dropna=False, observed=True)["video_id"]
         .transform("count")
     )
-    age_group_counts = out.groupby("age_bucket", dropna=False)["video_id"].transform("count")
+    age_group_counts = out.groupby("age_bucket", dropna=False, observed=True)["video_id"].transform("count")
 
-    out["peer_group"] = (
-        out["size_bucket"].astype(str) + "|" + out["age_bucket"].astype(str)
-    )
+    out["peer_group"] = out["size_bucket"].astype(str) + "|" + out["age_bucket"].astype(str)
     out.loc[detailed_group_counts < 5, "peer_group"] = "age:" + out["age_bucket"].astype(str)
     out.loc[age_group_counts < 8, "peer_group"] = "all"
 
@@ -666,9 +924,8 @@ def _score_outlier_frame(
     return out
 
 
-def _build_explanations(row: Mapping[str, Any]) -> Tuple[str, str, str]:
+def _primary_outlier_reason(row: Mapping[str, Any]) -> str:
     reasons: List[Tuple[float, str]] = []
-
     baseline_view_ratio = _coerce_float(row.get("baseline_views_ratio"))
     baseline_engagement_ratio = _coerce_float(row.get("baseline_engagement_ratio"))
     peer_percentile = float(row.get("peer_percentile") or 0)
@@ -687,23 +944,36 @@ def _build_explanations(row: Mapping[str, Any]) -> Tuple[str, str, str]:
         reasons.append((engagement_percentile, f"Top {top_share}% for engagement among comparable results"))
     if age_days <= 7:
         reasons.append((1.1, f"Published {age_days:.1f} day(s) ago and already accelerating"))
-    elif age_days <= 30:
-        reasons.append((0.7, f"Still outperforming only {age_days:.0f} day(s) after publish"))
 
     if not reasons:
-        reasons.append((1.0, "Strong relative performance across the scanned results"))
+        return "Strong relative performance across the scanned results"
 
     reasons.sort(key=lambda item: item[0], reverse=True)
-    texts = [text for _, text in reasons[:3]]
-    while len(texts) < 3:
-        texts.append("")
-    return texts[0], texts[1], texts[2]
+    return reasons[0][1]
+
+
+def _research_cue(row: Mapping[str, Any]) -> str:
+    title_pattern = str(row.get("title_pattern") or "General")
+    duration_bucket = str(row.get("duration_bucket") or "Unknown")
+    language_label = str(row.get("language_confidence_label") or "Low")
+    cues: List[str] = []
+
+    if title_pattern != "General":
+        cues.append(f"{title_pattern} packaging is repeating in this niche")
+    if duration_bucket not in ("Any", "Unknown"):
+        cues.append(f"{duration_bucket} videos are surfacing in the winning set")
+    if language_label == "High":
+        cues.append("Language match is strong enough for focused niche research")
+    if not cues:
+        cues.append("Review the hook, framing, and runtime for repeatable packaging ideas")
+    return cues[0]
 
 
 def _frame_to_candidates(frame: pd.DataFrame) -> Tuple[OutlierCandidate, ...]:
     candidates: List[OutlierCandidate] = []
     for row in frame.to_dict(orient="records"):
-        explanation_1, explanation_2, explanation_3 = _build_explanations(row)
+        why_outlier = _primary_outlier_reason(row)
+        research_cue = _research_cue(row)
         candidates.append(
             OutlierCandidate(
                 video_id=str(row["video_id"]),
@@ -734,6 +1004,11 @@ def _frame_to_candidates(frame: pd.DataFrame) -> Tuple[OutlierCandidate, ...]:
                 channel_country=str(row.get("channel_country", "")),
                 channel_default_language=str(row.get("channel_default_language", "")),
                 video_default_language=str(row.get("video_default_language", "")),
+                language_confidence=float(row.get("language_confidence") or 0.0),
+                language_confidence_label=str(row.get("language_confidence_label", "Low")),
+                duration_seconds=int(row.get("duration_seconds") or 0),
+                duration_bucket=str(row.get("duration_bucket", "Unknown")),
+                title_pattern=str(row.get("title_pattern", "General")),
                 outlier_score=float(row["outlier_score"]),
                 peer_percentile=float(row["peer_percentile"]),
                 engagement_percentile=float(row["engagement_percentile"]),
@@ -756,9 +1031,8 @@ def _frame_to_candidates(frame: pd.DataFrame) -> Tuple[OutlierCandidate, ...]:
                 ),
                 size_bucket=str(row["size_bucket"]),
                 age_bucket=str(row["age_bucket"]),
-                explanation_1=explanation_1,
-                explanation_2=explanation_2,
-                explanation_3=explanation_3,
+                why_outlier=why_outlier,
+                research_cue=research_cue,
             )
         )
     return tuple(candidates)
@@ -778,6 +1052,82 @@ def filter_candidates_by_subscriber_bucket(
     include_hidden_subscribers: bool,
 ) -> pd.DataFrame:
     return _filter_subscriber_bucket(frame, subscriber_bucket, include_hidden_subscribers)
+
+
+def build_age_bucket_summary(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty:
+        return pd.DataFrame(columns=["age_bucket", "outlier_count", "median_outlier_score", "median_views_per_day"])
+    working = frame.copy()
+    working["age_bucket"] = pd.Categorical(
+        working["age_bucket"],
+        categories=AGE_BUCKET_ORDER,
+        ordered=True,
+    )
+    out = (
+        working.groupby("age_bucket", dropna=False, observed=True)
+        .agg(
+            outlier_count=("video_id", "count"),
+            median_outlier_score=("outlier_score", "median"),
+            median_views_per_day=("views_per_day", "median"),
+        )
+        .reset_index()
+    )
+    return out.sort_values("age_bucket")
+
+
+def build_duration_summary(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty:
+        return pd.DataFrame(columns=["duration_bucket", "outlier_count", "median_outlier_score", "median_views_per_day"])
+    working = frame.copy()
+    working["duration_bucket"] = pd.Categorical(
+        working["duration_bucket"],
+        categories=[bucket for bucket in DURATION_BUCKET_ORDER if bucket != "Unknown"] + ["Unknown"],
+        ordered=True,
+    )
+    out = (
+        working.groupby("duration_bucket", dropna=False, observed=True)
+        .agg(
+            outlier_count=("video_id", "count"),
+            median_outlier_score=("outlier_score", "median"),
+            median_views_per_day=("views_per_day", "median"),
+        )
+        .reset_index()
+    )
+    return out.sort_values("duration_bucket")
+
+
+def build_title_pattern_summary(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty:
+        return pd.DataFrame(columns=["title_pattern", "outlier_count", "median_outlier_score"])
+    working = frame.copy()
+    working["title_pattern"] = pd.Categorical(
+        working["title_pattern"],
+        categories=TITLE_PATTERN_ORDER,
+        ordered=True,
+    )
+    out = (
+        working.groupby("title_pattern", dropna=False, observed=True)
+        .agg(
+            outlier_count=("video_id", "count"),
+            median_outlier_score=("outlier_score", "median"),
+        )
+        .reset_index()
+    )
+    return out.sort_values("title_pattern")
+
+
+def build_title_keyword_summary(frame: pd.DataFrame, top_n: int = 10) -> pd.DataFrame:
+    if frame.empty:
+        return pd.DataFrame(columns=["keyword", "count"])
+    tokens: List[str] = []
+    for title in frame["video_title"].fillna("").astype(str).tolist():
+        tokens.extend(_title_tokens(title))
+    if not tokens:
+        return pd.DataFrame(columns=["keyword", "count"])
+    series = pd.Series(tokens)
+    out = series.value_counts().head(top_n).reset_index()
+    out.columns = ["keyword", "count"]
+    return out
 
 
 @st.cache_data(ttl=OUTLIER_CACHE_TTL_SECONDS, show_spinner=False)
@@ -814,7 +1164,7 @@ def _search_outlier_videos_cached(request: OutlierSearchRequest) -> OutlierSearc
                 request=request,
                 candidates=tuple(),
                 warnings=(
-                    "The scanned cohort did not contain videos that survived your geography, language, or channel-size filters.",
+                    "The scanned cohort did not contain videos that survived your filters. Try broadening language, region, subscriber, or duration settings.",
                 ),
                 scanned_videos=0,
                 scanned_channels=0,
@@ -840,7 +1190,11 @@ def _search_outlier_videos_cached(request: OutlierSearchRequest) -> OutlierSearc
         baseline_failures = 0
         for row in shortlist.to_dict(orient="records"):
             uploads_playlist_id = str(
-                _safe_get(channels.get(str(row["channel_id"]), {}), ["contentDetails", "relatedPlaylists", "uploads"], "")
+                _safe_get(
+                    channels.get(str(row["channel_id"]), {}),
+                    ["contentDetails", "relatedPlaylists", "uploads"],
+                    "",
+                )
             ).strip()
             baseline = None
             try:
@@ -862,11 +1216,19 @@ def _search_outlier_videos_cached(request: OutlierSearchRequest) -> OutlierSearc
                 f"Baseline enrichment failed for {baseline_failures} channel(s); affected videos use peer-only fallback scoring."
             )
 
+        if request.relevance_language:
+            threshold = _language_threshold(request.language_strictness)
+            low_confidence = int((frame["language_confidence"] < threshold).sum())
+            if low_confidence:
+                warnings.append(
+                    "Language filtering uses metadata and title heuristics. Some results may still require manual review."
+                )
+
         scored = _score_outlier_frame(frame, baselines, request)
         return OutlierSearchResult(
             request=request,
             candidates=_frame_to_candidates(scored),
-            warnings=tuple(warnings),
+            warnings=tuple(dict.fromkeys(warnings)),
             scanned_videos=int(len(frame)),
             scanned_channels=int(frame["channel_id"].nunique()),
             baseline_channels=int(len(baselines)),

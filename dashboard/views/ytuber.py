@@ -1435,6 +1435,65 @@ def _queue_ai_studio_prefill(task: str, brief: str) -> None:
     st.rerun()
 
 
+def _queue_outlier_finder_page(prefill_query: str, note: str) -> None:
+    st.session_state["app_page"] = "Outlier Finder"
+    st.session_state["outlier_page_query"] = prefill_query.strip()
+    st.session_state["outlier_page_prefill_note"] = note
+    st.rerun()
+
+
+def _render_outliers_shortcut(channel_df: pd.DataFrame, channel_title: str) -> None:
+    section_header("Outlier Finder", icon="🚀")
+    keyword_hints = _top_keywords(channel_df, 8)
+    suggested_query = " ".join(keyword_hints[:3]).strip() or channel_title.strip()
+
+    st.markdown(
+        """
+        <div class="yt-card" style="padding:1.15rem 1.2rem;">
+            <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#94A3C7;margin-bottom:0.3rem;">Standalone Research Tool</div>
+            <div style="font-size:24px;font-weight:800;color:#FFFFFF;line-height:1.15;margin-bottom:0.45rem;">
+                Outlier Finder now lives as its own premium research workspace.
+            </div>
+            <div style="font-size:14px;color:#C8D1EA;max-width:760px;">
+                Search any niche, tighten the filters, and use the standalone page for cleaner breakout scans, structured AI research, standardized result cards, and methodology notes.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if keyword_hints:
+        st.markdown("**Suggested starter query from this channel**")
+        styled_keyword_chips(keyword_hints[:6])
+        st.caption(f"Recommended niche seed: `{suggested_query}`")
+
+    action_cols = st.columns([1.3, 1.1])
+    with action_cols[0]:
+        if st.button("Open Standalone Outlier Finder", type="primary", use_container_width=True):
+            _queue_outlier_finder_page(
+                prefill_query=suggested_query,
+                note=f"Prefilled from {channel_title}'s strongest recurring keywords. Adjust the niche query before running the scan.",
+            )
+    with action_cols[1]:
+        if st.button("Open With Current Channel Name", use_container_width=True):
+            _queue_outlier_finder_page(
+                prefill_query=channel_title,
+                note=f"Prefilled with the current channel name: {channel_title}. Replace it with a niche phrase if you want broader research.",
+            )
+
+    st.markdown(
+        """
+        <div class="yt-card" style="padding:0.9rem 1rem;">
+            <div style="font-size:13px;color:#FFFFFF;font-weight:700;margin-bottom:0.35rem;">Why the standalone page is better for this job</div>
+            <div style="font-size:13px;color:#C4CEE6;line-height:1.55;">
+                It supports stricter language filtering, exact versus broad search behavior, subscriber ranges, duration filtering, structured AI insights, and a dedicated methodology tab.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _compute_channel_audit(df: pd.DataFrame) -> Dict[str, Any]:
     out: Dict[str, Any] = {}
     ordered = df.sort_values("video_publishedAt").copy()
@@ -3207,7 +3266,7 @@ def render() -> None:
         keyword_hints = _render_keyword_intel(channel_df)
         st.session_state["ytuber_keyword_hints"] = keyword_hints
     elif active_module == "Outliers Finder":
-        _render_outliers_finder(channel_title)
+        _render_outliers_shortcut(channel_df, channel_title)
     elif active_module == "Title & SEO Lab":
         hints = st.session_state.get("ytuber_keyword_hints") or _top_keywords(channel_df, 20)
         _render_title_seo_lab(hints)

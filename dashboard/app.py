@@ -8,7 +8,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from dashboard.components.sidebar import render_sidebar
-from dashboard.views import channel_analysis, recommendations, ytuber
+from dashboard.views import channel_analysis, outlier_finder, recommendations, ytuber
 
 
 st.set_page_config(
@@ -314,6 +314,8 @@ elif page == "Recommendations":
     recommendations.render()
 elif page == "Ytuber":
     ytuber.render()
+elif page == "Outlier Finder":
+    outlier_finder.render()
 else:
     st.title("Deployment")
     st.markdown(
@@ -347,6 +349,14 @@ else:
         - `streamlit_app.py` is the root-level deployment entrypoint for Streamlit Cloud.
         - Channel Analysis and Recommendations use the committed CSV datasets under `data/youtube api data/`.
         - The Ytuber suite uses live API calls and rotates across the configured key pools.
+        - Outlier Finder is a standalone sidebar feature that scans the public YouTube search cohort, applies heuristic language filtering, and caches query results for one hour.
+
+        ### Outlier Finder Methodology Summary
+        - **Outlier Score:** weighted mix of baseline lift, peer percentile, engagement percentile, and recency boost.
+        - **Views Per Day:** views divided by video age in days.
+        - **Language Confidence:** metadata plus title-script heuristic, not a guaranteed classifier.
+        - **Important Caveat:** YouTube search is ranked and sampled, so Outlier Finder is not an exhaustive index of every relevant video on YouTube.
+        - For the full explanation of filters, metrics, and caveats, open **Outlier Finder -> Methodology** in the sidebar.
 
         ### Alternate Entrypoint
         ```bash

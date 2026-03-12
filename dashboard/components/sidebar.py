@@ -4,6 +4,17 @@ from streamlit_option_menu import option_menu
 
 def render_sidebar() -> str:
     """Render the branded sidebar navigation and return the selected page."""
+    page_options = [
+        "Channel Analysis",
+        "Recommendations",
+        "Ytuber",
+        "Outlier Finder",
+        "Deployment",
+    ]
+    current_page = st.session_state.get("app_page", page_options[0])
+    if current_page not in page_options:
+        current_page = page_options[0]
+
     with st.sidebar:
         st.markdown(
             """
@@ -24,9 +35,9 @@ def render_sidebar() -> str:
 
         selected = option_menu(
             menu_title=None,
-            options=["Channel Analysis", "Recommendations", "Ytuber", "Deployment"],
-            icons=["bar-chart-fill", "bullseye", "rocket-takeoff-fill", "gear"],
-            default_index=0,
+            options=page_options,
+            icons=["bar-chart-fill", "bullseye", "rocket-takeoff-fill", "search", "gear"],
+            default_index=page_options.index(current_page),
             styles={
                 "container": {
                     "padding": "0.2rem 0 0.5rem",
@@ -50,6 +61,8 @@ def render_sidebar() -> str:
                 },
             },
         )
+
+        st.session_state["app_page"] = selected
 
         st.markdown("<hr style='border-color:rgba(255,255,255,0.10);margin:0.4rem 0 0.6rem;' />", unsafe_allow_html=True)
 

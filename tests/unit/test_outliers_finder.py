@@ -6,6 +6,9 @@ import pandas as pd
 from src.services.outliers_finder import (
     ChannelBaseline,
     OutlierSearchRequest,
+    build_age_bucket_summary,
+    build_duration_summary,
+    build_title_pattern_summary,
     filter_candidates_by_subscriber_bucket,
     score_outlier_candidates_frame,
 )
@@ -177,3 +180,28 @@ def test_filter_candidates_by_subscriber_bucket_respects_hidden_toggle() -> None
 
     assert set(filtered["video_id"].tolist()) == {"video-1", "video-2", "video-3"}
     assert "video-4" not in filtered["video_id"].tolist()
+
+
+def test_summary_builders_keep_human_readable_ordering() -> None:
+    frame = _candidate_frame().copy()
+    frame["outlier_score"] = [91.0, 62.0, 74.0, 68.0]
+    frame["duration_bucket"] = ["4-12 min", "Shorts (<=60s)", "12-30 min", "1-4 min"]
+    frame["title_pattern"] = ["How / Why", "Numbered", "Versus", "Explainer"]
+
+    age_summary = build_age_bucket_summary(frame)
+    duration_summary = build_duration_summary(frame)
+    pattern_summary = build_title_pattern_summary(frame)
+
+    assert age_summary.iloc[0]["age_bucket"] == "3-7d"
+    assert duration_summary["duration_bucket"].tolist()[:4] == [
+        "Shorts (<=60s)",
+        "1-4 min",
+        "4-12 min",
+        "12-30 min",
+    ]
+    assert pattern_summary["title_pattern"].tolist()[:4] == [
+        "How / Why",
+        "Numbered",
+        "Explainer",
+        "Versus",
+    ]
