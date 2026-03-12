@@ -96,13 +96,18 @@ def _inject_outlier_css() -> None:
             margin: 0 auto 1.6rem;
             max-width: var(--app-command-width);
         }
-        [data-testid="stForm"] [data-testid="stFormSubmitButton"] {
-            padding-top: 1.92rem;
+        [data-testid="stForm"] [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] {
+            row-gap: 0.95rem;
+        }
+        [data-testid="stForm"] [data-testid="stVerticalBlockBorderWrapper"] {
+            min-height: calc(var(--app-control-height) + 40px);
+            padding: 0.05rem 0.15rem;
         }
         [data-testid="stExpander"] {
             border: 1px solid rgba(255,255,255,0.08);
             border-radius: 18px;
             background: rgba(255,255,255,0.02);
+            margin-top: 0.15rem;
         }
         .outlier-page {
             max-width: var(--app-page-width);
@@ -185,12 +190,29 @@ def _inject_outlier_css() -> None:
             color: #97A2C3;
             font-size: 12px;
             line-height: 1.55;
+            margin-top: 0.75rem;
         }
         .outlier-inline-field-label {
             color: #B8C1DA;
             font-size: 14px;
             font-weight: 600;
             margin-bottom: 0.45rem;
+        }
+        .outlier-row-label {
+            color: #8E9AC0;
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin: 0 0 0.5rem;
+        }
+        .outlier-visibility-copy {
+            color: #8E9AC0;
+            font-size: 12px;
+            line-height: 1.5;
+            margin-top: 0.35rem;
+        }
+        .outlier-form-gap {
+            height: 0.25rem;
         }
         .outlier-prefill-note {
             display: inline-flex;
@@ -526,9 +548,6 @@ def _inject_outlier_css() -> None:
             }
             [data-testid="stForm"] {
                 padding: 1.2rem 1rem 1rem;
-            }
-            [data-testid="stForm"] [data-testid="stFormSubmitButton"] {
-                padding-top: 0.15rem;
             }
         }
         </style>
@@ -1189,7 +1208,7 @@ def render() -> None:
     with st.form("outlier_finder_search_form"):
         _render_search_header()
 
-        query_cols = st.columns([4, 1, 1], gap="medium")
+        query_cols = st.columns([1.8, 1], gap="medium")
         with query_cols[0]:
             niche_query = st.text_input(
                 "Niche Or Keyword",
@@ -1197,16 +1216,19 @@ def render() -> None:
                 placeholder="AI automation, documentary storytelling, science shorts, luxury fitness...",
             )
         with query_cols[1]:
-            submitted = st.form_submit_button(
-                "Find Outliers",
-                type="primary",
-                use_container_width=True,
-                disabled=provider_counts["youtube"] <= 0,
-            )
-        with query_cols[2]:
-            reset_clicked = st.form_submit_button("Reset Filters", use_container_width=True)
+            st.markdown('<div class="outlier-inline-field-label">Actions</div>', unsafe_allow_html=True)
+            action_cols = st.columns(2, gap="small")
+            with action_cols[0]:
+                submitted = st.form_submit_button(
+                    "Find Outliers",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=provider_counts["youtube"] <= 0,
+                )
+            with action_cols[1]:
+                reset_clicked = st.form_submit_button("Reset Filters", use_container_width=True)
 
-        filter_row_one = st.columns(4, gap="small")
+        filter_row_one = st.columns(4, gap="medium")
         with filter_row_one[0]:
             timeframe = st.selectbox("Timeframe", TIMEFRAME_OPTIONS, index=1, key="outlier_page_timeframe")
         with filter_row_one[1]:
@@ -1234,7 +1256,7 @@ def render() -> None:
         else:
             custom_dates = None
 
-        filter_row_two = st.columns(4, gap="small")
+        filter_row_two = st.columns(4, gap="medium")
         with filter_row_two[0]:
             freshness_focus = st.selectbox(
                 "Freshness Focus",
@@ -1266,31 +1288,39 @@ def render() -> None:
                 format_func=lambda value: "No Minimum" if value == 0 else f"{value:,}+",
             )
 
-        numeric_cols = st.columns(3, gap="small")
-        with numeric_cols[0]:
-            min_subscribers = st.number_input(
-                "Minimum Subscribers",
-                min_value=0,
-                value=0,
-                step=1_000,
-                key="outlier_page_min_subscribers",
-            )
-        with numeric_cols[1]:
-            max_subscribers = st.number_input(
-                "Maximum Subscribers",
-                min_value=0,
-                value=0,
-                step=1_000,
-                key="outlier_page_max_subscribers",
-                help="Leave at 0 to keep the upper bound open.",
-            )
-        with numeric_cols[2]:
-            st.markdown('<div class="outlier-inline-field-label">Subscriber Visibility</div>', unsafe_allow_html=True)
-            include_hidden = st.toggle(
-                "Include Hidden Subscriber Counts",
-                value=True,
-                key="outlier_page_include_hidden",
-            )
+        channel_cols = st.columns([1.85, 1], gap="medium")
+        with channel_cols[0]:
+            st.markdown('<div class="outlier-row-label">Channel Size</div>', unsafe_allow_html=True)
+            subscriber_cols = st.columns(2, gap="small")
+            with subscriber_cols[0]:
+                min_subscribers = st.number_input(
+                    "Minimum Subscribers",
+                    min_value=0,
+                    value=0,
+                    step=1_000,
+                    key="outlier_page_min_subscribers",
+                )
+            with subscriber_cols[1]:
+                max_subscribers = st.number_input(
+                    "Maximum Subscribers",
+                    min_value=0,
+                    value=0,
+                    step=1_000,
+                    key="outlier_page_max_subscribers",
+                    help="Leave at 0 to keep the upper bound open.",
+                )
+        with channel_cols[1]:
+            st.markdown('<div class="outlier-row-label">Subscriber Visibility</div>', unsafe_allow_html=True)
+            with st.container(border=True):
+                include_hidden = st.toggle(
+                    "Include Hidden Subscriber Counts",
+                    value=True,
+                    key="outlier_page_include_hidden",
+                )
+                st.markdown(
+                    '<div class="outlier-visibility-copy">Keep channels with hidden subscriber counts in the scan when subscriber size is not publicly visible.</div>',
+                    unsafe_allow_html=True,
+                )
 
         exclude_keywords_text = st.text_input(
             "Exclude Keywords",
@@ -1298,8 +1328,9 @@ def render() -> None:
             placeholder="news, reaction, podcast clips",
         )
 
+        st.markdown('<div class="outlier-form-gap"></div>', unsafe_allow_html=True)
         with st.expander("More Filters", expanded=False):
-            advanced_cols = st.columns(3, gap="small")
+            advanced_cols = st.columns(3, gap="medium")
             with advanced_cols[0]:
                 search_pages = st.slider(
                     "Search Depth",

@@ -346,6 +346,28 @@ button[kind="secondaryFormSubmit"]:hover {
     opacity: 1 !important;
 }
 
+[data-testid="stSegmentedControl"] {
+    width: 100%;
+}
+
+[data-testid="stSegmentedControl"] [data-baseweb="button-group"],
+[data-testid="stSegmentedControl"] [role="radiogroup"] {
+    width: 100%;
+    display: flex !important;
+}
+
+[data-testid="stSegmentedControl"] [data-baseweb="button-group"] > *,
+[data-testid="stSegmentedControl"] [role="radiogroup"] > * {
+    flex: 1 1 0 !important;
+}
+
+[data-testid="stSegmentedControl"] button,
+[data-testid="stSegmentedControl"] [role="radio"] {
+    min-height: var(--app-control-height) !important;
+    width: 100% !important;
+    justify-content: center !important;
+}
+
 .stToggle label, .stCheckbox label, .stRadio label, .stSelectbox label,
 .stDateInput label, .stTextInput label, .stSlider label, .stNumberInput label {
     color: var(--app-text-secondary) !important;
