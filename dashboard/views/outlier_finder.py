@@ -9,7 +9,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from dashboard.components.visualizations import section_header, styled_dataframe, styled_keyword_chips
+from dashboard.components.visualizations import styled_dataframe, styled_keyword_chips
 from src.services.outlier_ai import InsightCard, OutlierAIReport, generate_outlier_ai_report
 from src.services.outliers_finder import (
     DURATION_BUCKET_ORDER,
@@ -91,10 +91,13 @@ def _inject_outlier_css() -> None:
                 linear-gradient(180deg, rgba(26, 33, 64, 0.94) 0%, rgba(15, 19, 36, 0.98) 100%);
             border: 1px solid rgba(255,255,255,0.08);
             border-radius: 30px;
-            padding: 1.35rem 1.35rem 1.1rem;
+            padding: 1.5rem 1.5rem 1.2rem;
             box-shadow: 0 20px 48px rgba(3, 6, 20, 0.42);
-            margin: 0 auto 1.2rem;
-            max-width: 1140px;
+            margin: 0 auto 1.6rem;
+            max-width: var(--app-command-width);
+        }
+        [data-testid="stForm"] [data-testid="stFormSubmitButton"] {
+            padding-top: 1.92rem;
         }
         [data-testid="stExpander"] {
             border: 1px solid rgba(255,255,255,0.08);
@@ -102,12 +105,12 @@ def _inject_outlier_css() -> None:
             background: rgba(255,255,255,0.02);
         }
         .outlier-page {
-            max-width: 1220px;
+            max-width: var(--app-page-width);
             margin: 0 auto;
         }
         .outlier-hero {
-            max-width: 980px;
-            margin: 0 auto 1.4rem;
+            max-width: 920px;
+            margin: 0 auto 1.8rem;
             text-align: center;
         }
         .outlier-kicker {
@@ -163,7 +166,7 @@ def _inject_outlier_css() -> None:
             font-size: 12px;
         }
         .outlier-shell-head {
-            margin-bottom: 0.85rem;
+            margin-bottom: 1.1rem;
         }
         .outlier-shell-title {
             font-family: "Space Grotesk", "Plus Jakarta Sans", system-ui, sans-serif;
@@ -176,47 +179,29 @@ def _inject_outlier_css() -> None:
             color: #B8C1DA;
             font-size: 13px;
             line-height: 1.55;
-        }
-        .outlier-control-spacer {
-            height: 1.95rem;
+            max-width: 620px;
         }
         .outlier-helper {
             color: #97A2C3;
             font-size: 12px;
             line-height: 1.55;
         }
+        .outlier-inline-field-label {
+            color: #B8C1DA;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 0.45rem;
+        }
         .outlier-prefill-note {
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
             padding: 0.55rem 0.8rem;
-            margin: 0 auto 1rem;
+            margin: 0 auto 1.05rem;
             border-radius: 999px;
             background: rgba(139, 92, 246, 0.13);
             border: 1px solid rgba(196, 181, 253, 0.18);
             color: #E6DFFC;
-            font-size: 12px;
-        }
-        .outlier-action-strip {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 0.9rem;
-            flex-wrap: wrap;
-            margin: 0.35rem 0 1.15rem;
-        }
-        .outlier-action-meta {
-            display: flex;
-            gap: 0.55rem;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-        }
-        .outlier-meta-pill {
-            padding: 0.45rem 0.72rem;
-            border-radius: 999px;
-            background: rgba(255,255,255,0.04);
-            border: 1px solid rgba(255,255,255,0.08);
-            color: #D7DDF0;
             font-size: 12px;
         }
         .outlier-panel-note {
@@ -230,11 +215,17 @@ def _inject_outlier_css() -> None:
             line-height: 1.6;
         }
         .outlier-section {
-            margin-top: 1.7rem;
+            margin-top: 2rem;
+        }
+        .outlier-results-summary {
+            color: #B8C1DA;
+            font-size: 13px;
+            line-height: 1.55;
+            margin-top: 0.18rem;
         }
         .outlier-summary-card {
             border-radius: 22px;
-            min-height: 150px;
+            min-height: 156px;
             padding: 1rem 1rem 0.95rem;
             background: linear-gradient(180deg, rgba(34, 42, 76, 0.96) 0%, rgba(20, 26, 49, 0.98) 100%);
             border: 1px solid rgba(255,255,255,0.08);
@@ -415,12 +406,14 @@ def _inject_outlier_css() -> None:
         }
         .outlier-ai-card {
             border-radius: 22px;
-            min-height: 170px;
+            min-height: 188px;
             padding: 1rem 1rem 0.95rem;
             background: linear-gradient(180deg, rgba(33, 40, 73, 0.98) 0%, rgba(20, 26, 49, 0.99) 100%);
             border: 1px solid rgba(255,255,255,0.08);
             box-shadow: 0 18px 40px rgba(3, 6, 20, 0.38);
             margin-bottom: 0.9rem;
+            display: flex;
+            flex-direction: column;
         }
         .outlier-ai-card-title {
             font-family: "Space Grotesk", "Plus Jakarta Sans", system-ui, sans-serif;
@@ -433,12 +426,51 @@ def _inject_outlier_css() -> None:
             color: #D7DDF0;
             font-size: 13px;
             line-height: 1.58;
+            flex: 1;
         }
         .outlier-ai-card-support {
             color: #95A3C7;
             font-size: 12px;
             line-height: 1.45;
             margin-top: 0.5rem;
+        }
+        .outlier-quality-card {
+            min-height: 320px;
+            display: flex;
+            flex-direction: column;
+        }
+        .outlier-quality-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.65rem;
+            margin-top: 0.85rem;
+        }
+        .outlier-quality-metric {
+            border-radius: 18px;
+            padding: 0.82rem 0.85rem;
+            background: rgba(255,255,255,0.035);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .outlier-quality-label {
+            color: #95A3C7;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 0.25rem;
+        }
+        .outlier-quality-value {
+            color: #F7F8FC;
+            font-family: "Space Grotesk", "Plus Jakarta Sans", system-ui, sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            line-height: 1.05;
+        }
+        .outlier-quality-note {
+            color: #B8C1DA;
+            font-size: 12px;
+            line-height: 1.6;
+            margin-top: auto;
+            padding-top: 0.85rem;
         }
         .outlier-empty-card {
             border-radius: 24px;
@@ -491,6 +523,12 @@ def _inject_outlier_css() -> None:
         @media (max-width: 980px) {
             .outlier-title {
                 font-size: 42px;
+            }
+            [data-testid="stForm"] {
+                padding: 1.2rem 1rem 1rem;
+            }
+            [data-testid="stForm"] [data-testid="stFormSubmitButton"] {
+                padding-top: 0.15rem;
             }
         }
         </style>
@@ -642,36 +680,79 @@ def _render_prefill_note(note: str) -> None:
     )
 
 
-def _build_active_filters(result) -> List[str]:
-    active_filters = [result.request.niche_query]
+def _truncate_copy(value: str, limit: int = 34) -> str:
+    text = str(value or "").strip()
+    if len(text) <= limit:
+        return text
+    return f"{text[:limit - 1].rstrip()}…"
+
+
+def _render_section_intro(title: str, copy: str) -> None:
+    st.markdown(
+        (
+            '<div class="app-section-intro">'
+            f'<div class="app-section-title">{escape(title)}</div>'
+            f'<div class="app-section-copy">{escape(copy)}</div>'
+            "</div>"
+        ),
+        unsafe_allow_html=True,
+    )
+
+
+def _render_subsection_label(label: str) -> None:
+    st.markdown(f'<div class="app-subsection-label">{escape(label)}</div>', unsafe_allow_html=True)
+
+
+def _meta_pill_html(label: str, value: str, *, state: bool = False) -> str:
+    classes = "app-meta-pill app-meta-pill--state" if state else "app-meta-pill"
+    if label:
+        body = f"<strong>{escape(label)}:</strong> {escape(value)}"
+    else:
+        body = escape(value)
+    return f'<span class="{classes}">{body}</span>'
+
+
+def _build_filter_tags(result) -> List[Tuple[str, str]]:
+    tags: List[Tuple[str, str]] = [("Niche", _truncate_copy(result.request.niche_query, 38))]
     if result.request.relevance_language:
-        active_filters.append(
-            f"Language: {result.request.relevance_language.upper()} ({result.request.language_strictness.title()})"
+        tags.append(
+            ("Language", f"{result.request.relevance_language.upper()} ({result.request.language_strictness.title()})")
         )
     if result.request.region_code:
-        active_filters.append(f"Region: {result.request.region_code}")
+        tags.append(("Region", result.request.region_code))
     if result.request.duration_preference != "Any":
-        active_filters.append(result.request.duration_preference)
+        tags.append(("Duration", result.request.duration_preference))
     if result.request.min_views > 0:
-        active_filters.append(f"{result.request.min_views:,}+ Views")
+        tags.append(("Minimum Views", f"{result.request.min_views:,}+"))
     if result.request.match_mode == "exact":
-        active_filters.append("Exact Phrase")
-    return active_filters[:8]
+        tags.append(("Match", "Exact Phrase"))
+    if len(tags) > 5:
+        visible = tags[:5]
+        visible.append(("", f"+{len(tags) - 5} More"))
+        return visible
+    return tags
 
 
-def _render_action_strip(result, result_frame: pd.DataFrame) -> None:
-    active_filters = _build_active_filters(result)
-    left_col, right_col = st.columns([2.3, 1.1], gap="medium")
-    with left_col:
-        styled_keyword_chips(active_filters)
-    with right_col:
-        pills = [
-            f"{len(result_frame):,} Results",
-            result.cache_policy,
-            result.quota_profile,
-        ]
-        meta_html = "".join(f'<span class="outlier-meta-pill">{escape(pill)}</span>' for pill in pills)
-        st.markdown(f'<div class="outlier-action-meta">{meta_html}</div>', unsafe_allow_html=True)
+def _build_state_tags(result, result_frame: pd.DataFrame) -> List[Tuple[str, str]]:
+    return [
+        ("Results", f"{len(result_frame):,}"),
+        ("Cache", result.cache_policy),
+        ("Quota", result.quota_profile),
+    ]
+
+
+def _render_metadata_cluster(result, result_frame: pd.DataFrame) -> None:
+    filter_html = "".join(_meta_pill_html(label, value) for label, value in _build_filter_tags(result))
+    state_html = "".join(_meta_pill_html(label, value, state=True) for label, value in _build_state_tags(result, result_frame))
+    st.markdown(
+        (
+            '<div class="app-meta-stack">'
+            f'<div class="app-meta-group">{filter_html}</div>'
+            f'<div class="app-meta-group">{state_html}</div>'
+            "</div>"
+        ),
+        unsafe_allow_html=True,
+    )
 
 
 def _render_result_card(row: pd.Series) -> None:
@@ -856,21 +937,28 @@ def _title_pattern_chart(result_frame: pd.DataFrame):
 
 def _render_scan_quality_card(result_frame: pd.DataFrame) -> None:
     quality = build_scan_quality_summary(result_frame)
-    _render_chart_shell(
-        "Scan Quality",
-        "Use this quick read to judge how clean and actionable the surfaced cohort is before you hand it to AI.",
+    metrics = [
+        ("Language Match", _format_pct(quality["high_language_match_share"])),
+        ("Recent Uploads", _format_pct(quality["recent_upload_share"])),
+        ("Strong Signals", _format_pct(quality["strong_signal_share"])),
+        ("Hidden Subs", _format_pct(quality["hidden_subscriber_share"])),
+    ]
+    metrics_html = "".join(
+        (
+            '<div class="outlier-quality-metric">'
+            f'<div class="outlier-quality-label">{escape(label)}</div>'
+            f'<div class="outlier-quality-value">{escape(value)}</div>'
+            "</div>"
+        )
+        for label, value in metrics
     )
     st.markdown(
         (
-            '<div class="outlier-ai-card">'
-            '<div class="outlier-ai-card-title">Signal Quality Snapshot</div>'
-            '<div class="outlier-ai-card-body">'
-            f"High Language Match: {_format_pct(quality['high_language_match_share'])}<br>"
-            f"Recent Upload Share: {_format_pct(quality['recent_upload_share'])}<br>"
-            f"Strong Signal Share: {_format_pct(quality['strong_signal_share'])}<br>"
-            f"Hidden Subscriber Share: {_format_pct(quality['hidden_subscriber_share'])}"
+            '<div class="outlier-quality-card">'
+            '<div class="outlier-quality-grid">'
+            f"{metrics_html}"
             '</div>'
-            '<div class="outlier-ai-card-support">High language match and strong signal share indicate a cleaner research set. A higher hidden-subscriber share reduces channel-size certainty.</div>'
+            '<div class="outlier-quality-note">High language match and strong-signal share usually indicate a cleaner research set. A higher hidden-subscriber share weakens channel-size confidence.</div>'
             '</div>'
         ),
         unsafe_allow_html=True,
@@ -893,11 +981,17 @@ def _render_ai_card(card: InsightCard) -> None:
 def _render_ai_card_grid(title: str, cards: Sequence[InsightCard], columns: int = 2) -> None:
     if not cards:
         return
-    st.markdown(f"**{title}**")
-    cols = st.columns(columns, gap="medium")
-    for idx, card in enumerate(cards):
-        with cols[idx % columns]:
-            _render_ai_card(card)
+    _render_subsection_label(title)
+    pair_size = max(1, columns)
+    for start in range(0, len(cards), pair_size):
+        batch = cards[start:start + pair_size]
+        if len(batch) == 1:
+            _render_ai_card(batch[0])
+            continue
+        cols = st.columns(len(batch), gap="medium")
+        for col, card in zip(cols, batch):
+            with col:
+                _render_ai_card(card)
 
 
 def _render_ai_report(report: OutlierAIReport) -> None:
@@ -932,31 +1026,52 @@ def _render_ai_report(report: OutlierAIReport) -> None:
     _render_ai_card_grid("Notable Anomalies", report.notable_anomalies, columns=2)
 
     if report.next_steps:
-        st.markdown("**What To Test Next**")
-        cols = st.columns(2, gap="medium")
-        for idx, step in enumerate(report.next_steps):
-            with cols[idx % 2]:
+        _render_subsection_label("What To Test Next")
+        for start in range(0, len(report.next_steps), 2):
+            batch = report.next_steps[start:start + 2]
+            if len(batch) == 1:
+                step = batch[0]
                 st.markdown(
                     (
                         '<div class="outlier-ai-card">'
-                        f'<div class="outlier-ai-card-title">Action {idx + 1}</div>'
+                        f'<div class="outlier-ai-card-title">Action {start + 1}</div>'
                         f'<div class="outlier-ai-card-body">{escape(step)}</div>'
                         '<div class="outlier-ai-card-support">Use this as the next concrete experiment to test against your current packaging and publishing rhythm.</div>'
                         '</div>'
                     ),
                     unsafe_allow_html=True,
                 )
+                continue
+            cols = st.columns(2, gap="medium")
+            for idx, (col, step) in enumerate(zip(cols, batch), start=start + 1):
+                with col:
+                    st.markdown(
+                        (
+                            '<div class="outlier-ai-card">'
+                            f'<div class="outlier-ai-card-title">Action {idx}</div>'
+                            f'<div class="outlier-ai-card-body">{escape(step)}</div>'
+                            '<div class="outlier-ai-card-support">Use this as the next concrete experiment to test against your current packaging and publishing rhythm.</div>'
+                            '</div>'
+                        ),
+                        unsafe_allow_html=True,
+                    )
 
     if report.warnings:
-        st.warning(" | ".join(report.warnings))
+        st.markdown(
+            f'<div class="outlier-panel-note">{" | ".join(escape(warning) for warning in report.warnings)}</div>',
+            unsafe_allow_html=True,
+        )
     if report.raw_fallback:
-        st.caption("Fallback Summary")
+        st.markdown('<div class="outlier-panel-note"><strong>Fallback Summary.</strong> The AI provider returned unstructured output for this run, so the text below is shown as plain summary copy.</div>', unsafe_allow_html=True)
         st.markdown(report.raw_fallback)
 
 
 def _render_methodology_section() -> None:
-    section_header("How This Works")
-    with st.expander("Open The Metric Definitions, Filter Rules, And Caveats", expanded=False):
+    _render_section_intro(
+        "How This Works",
+        "Use these notes to understand what the score means, how the filters behave, and what the public-data caveats imply for your research decisions.",
+    )
+    with st.expander("Open Metric Definitions, Filter Rules, And Caveats", expanded=False):
         left_col, right_col = st.columns(2, gap="medium")
         with left_col:
             st.markdown(
@@ -977,10 +1092,6 @@ def _render_methodology_section() -> None:
                 ),
                 unsafe_allow_html=True,
             )
-        st.markdown(
-            '<div class="outlier-footnote">Results come from the scanned cohort returned by the official YouTube API. Language filtering is heuristic-based and becomes stricter as confidence requirements increase.</div>',
-            unsafe_allow_html=True,
-        )
         with right_col:
             st.markdown(
                 (
@@ -1005,6 +1116,10 @@ def _render_methodology_section() -> None:
                 ),
                 unsafe_allow_html=True,
             )
+    st.markdown(
+        '<div class="outlier-footnote">Results come from the scanned cohort returned by the official YouTube API. Language filtering is heuristic-based and becomes stricter as confidence requirements increase.</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def _render_pre_search_methodology_teaser() -> None:
@@ -1074,7 +1189,7 @@ def render() -> None:
     with st.form("outlier_finder_search_form"):
         _render_search_header()
 
-        query_cols = st.columns([3.25, 1.1, 0.95], gap="small")
+        query_cols = st.columns([4, 1, 1], gap="medium")
         with query_cols[0]:
             niche_query = st.text_input(
                 "Niche Or Keyword",
@@ -1082,7 +1197,6 @@ def render() -> None:
                 placeholder="AI automation, documentary storytelling, science shorts, luxury fitness...",
             )
         with query_cols[1]:
-            st.markdown('<div class="outlier-control-spacer"></div>', unsafe_allow_html=True)
             submitted = st.form_submit_button(
                 "Find Outliers",
                 type="primary",
@@ -1090,7 +1204,6 @@ def render() -> None:
                 disabled=provider_counts["youtube"] <= 0,
             )
         with query_cols[2]:
-            st.markdown('<div class="outlier-control-spacer"></div>', unsafe_allow_html=True)
             reset_clicked = st.form_submit_button("Reset Filters", use_container_width=True)
 
         filter_row_one = st.columns(4, gap="small")
@@ -1172,6 +1285,7 @@ def render() -> None:
                 help="Leave at 0 to keep the upper bound open.",
             )
         with numeric_cols[2]:
+            st.markdown('<div class="outlier-inline-field-label">Subscriber Visibility</div>', unsafe_allow_html=True)
             include_hidden = st.toggle(
                 "Include Hidden Subscriber Counts",
                 value=True,
@@ -1280,7 +1394,7 @@ def render() -> None:
         return
 
     for warning in result.warnings:
-        st.warning(warning)
+        st.markdown(f'<div class="outlier-panel-note">{escape(warning)}</div>', unsafe_allow_html=True)
 
     result_frame = result.to_frame()
     if result_frame.empty:
@@ -1291,9 +1405,12 @@ def render() -> None:
         _render_methodology_section()
         return
 
-    sort_cols = st.columns([2.4, 1], gap="medium")
+    sort_cols = st.columns([2.5, 1], gap="medium")
     with sort_cols[0]:
-        section_header("Top Outliers In This Scan")
+        _render_section_intro(
+            "Top Outliers In This Scan",
+            f"{len(result_frame):,} results surfaced from {result.scanned_videos:,} scanned uploads across {result.scanned_channels:,} channels.",
+        )
     with sort_cols[1]:
         sort_label = st.selectbox(
             "Sort Results By",
@@ -1304,7 +1421,7 @@ def render() -> None:
 
     sort_column, ascending = SORT_OPTIONS[sort_label]
     sorted_frame = result_frame.sort_values(sort_column, ascending=ascending).reset_index(drop=True)
-    _render_action_strip(result, sorted_frame)
+    _render_metadata_cluster(result, sorted_frame)
 
     _render_result_cards(sorted_frame)
 
@@ -1339,39 +1456,46 @@ def render() -> None:
     )
     styled_dataframe(
         table_df,
-        title="All Surfaced Results",
+        title="All Results In This Scan",
         precision=2,
         image_columns=["Thumbnail"],
     )
 
-    section_header("Breakout Snapshot")
+    _render_section_intro(
+        "Breakout Snapshot",
+        "Read the surfaced cohort through score, velocity, packaging, runtime, and signal quality before you hand the research to AI.",
+    )
     summary_stats = _build_summary_stats(sorted_frame)
     summary_cols = st.columns(4, gap="medium")
     summary_cards = [
         ("Median Outlier Score", f"{summary_stats.get('median_outlier_score', 0):.1f}", "The middle-performing winner in this scan."),
         ("Median Views / Day", _format_int(summary_stats.get("median_views_per_day")), "Typical breakout velocity across surfaced videos."),
-        ("Videos / Channels", f"{result.scanned_videos:,} / {result.scanned_channels:,}", "Coverage of the scanned cohort after filters."),
-        ("Language Match", f"{summary_stats.get('high_language_share', 0):.1f}%", "Share of results with a high-confidence language match."),
+        ("Scanned Videos / Channels", f"{result.scanned_videos:,} / {result.scanned_channels:,}", "Coverage of the scanned cohort after filters."),
+        ("High-Confidence Language Match", f"{summary_stats.get('high_language_share', 0):.1f}%", "Share of results with a high-confidence language match."),
     ]
     for idx, (label, value, detail) in enumerate(summary_cards):
         with summary_cols[idx]:
             _render_summary_card(label, value, detail)
 
-    chart_top = st.columns([1.45, 1], gap="medium")
+    chart_top = st.columns([7, 5], gap="medium")
     with chart_top[0]:
         with st.container(border=True):
             _render_chart_shell(
                 "Breakout Map",
                 "Spot which videos are gaining velocity faster than channel size alone would suggest.",
             )
-            st.plotly_chart(_breakout_scatter(sorted_frame), use_container_width=True)
+            breakout_fig = _breakout_scatter(sorted_frame)
+            breakout_fig.update_layout(height=400)
+            st.plotly_chart(breakout_fig, use_container_width=True)
     with chart_top[1]:
         with st.container(border=True):
             _render_chart_shell(
                 "Outlier Score By Publish Age",
                 "See whether the niche momentum is being driven by very recent uploads or older releases.",
             )
-            st.plotly_chart(_age_bucket_chart(sorted_frame), use_container_width=True)
+            age_fig = _age_bucket_chart(sorted_frame)
+            age_fig.update_layout(height=400)
+            st.plotly_chart(age_fig, use_container_width=True)
 
     chart_bottom = st.columns(3, gap="medium")
     with chart_bottom[0]:
@@ -1380,32 +1504,37 @@ def render() -> None:
                 "Winning Video Lengths",
                 "Identify which runtime buckets are overperforming in the current result set.",
             )
-            st.plotly_chart(_duration_chart(sorted_frame), use_container_width=True)
+            duration_fig = _duration_chart(sorted_frame)
+            duration_fig.update_layout(height=320)
+            st.plotly_chart(duration_fig, use_container_width=True)
     with chart_bottom[1]:
         with st.container(border=True):
             _render_chart_shell(
                 "Repeated Title Structures",
                 "Read the packaging patterns that appear repeatedly across the strongest videos.",
             )
-            st.plotly_chart(_title_pattern_chart(sorted_frame), use_container_width=True)
+            title_pattern_fig = _title_pattern_chart(sorted_frame)
+            title_pattern_fig.update_layout(height=320)
+            st.plotly_chart(title_pattern_fig, use_container_width=True)
     with chart_bottom[2]:
         with st.container(border=True):
+            _render_chart_shell(
+                "Scan Quality",
+                "Use this quick read to judge how clean and actionable the surfaced cohort is before you hand it to AI.",
+            )
             _render_scan_quality_card(sorted_frame)
 
-    section_header("AI Research")
-    st.markdown(
-        (
-            '<div class="outlier-empty-card">'
-            '<div class="outlier-empty-title">Turn The Scan Into Actionable Research</div>'
-            '<div class="outlier-empty-copy">Generate structured AI insight cards for themes, title patterns, repeatable angles, caveats, and next-step experiments. The AI layer reads the strongest public signals in the scan; it does not replace the evidence shown above.</div>'
-            '</div>'
-        ),
-        unsafe_allow_html=True,
+    _render_section_intro(
+        "AI Research",
+        "Turn the surfaced evidence into structured theme, title, angle, anomaly, and next-step cards after you review the results above.",
     )
 
     available_providers = [provider for provider in ("gemini", "openai") if get_provider_key_count(provider) > 0]
     if not available_providers:
-        st.info("Add `GEMINI_API_KEYS` and/or `OPENAI_API_KEYS` to unlock the structured AI research layer.")
+        st.markdown(
+            '<div class="outlier-panel-note">Add <code>GEMINI_API_KEYS</code> and/or <code>OPENAI_API_KEYS</code> to unlock the structured AI research layer.</div>',
+            unsafe_allow_html=True,
+        )
     else:
         default_provider = "gemini" if "gemini" in available_providers else available_providers[0]
         if (
@@ -1431,7 +1560,7 @@ def render() -> None:
         with provider_cols[1]:
             model = st.selectbox("AI Model", models, key="outlier_page_ai_model")
         with provider_cols[2]:
-            st.markdown('<div class="outlier-control-spacer"></div>', unsafe_allow_html=True)
+            st.markdown('<div class="outlier-inline-field-label">Research Action</div>', unsafe_allow_html=True)
             trigger_ai = st.button("Generate AI Research", type="primary", use_container_width=True)
 
         fingerprint = _result_fingerprint(sorted_frame, result.request.niche_query)
@@ -1472,7 +1601,7 @@ def render() -> None:
             keyword_summary = build_title_keyword_summary(sorted_frame)
             preview_tokens = keyword_summary["keyword"].tolist()[:8] if not keyword_summary.empty else []
             if preview_tokens:
-                st.markdown("**Repeated Title Keywords In The Scan**")
+                _render_subsection_label("Repeated Title Keywords In The Scan")
                 styled_keyword_chips(preview_tokens)
             st.markdown(
                 '<div class="outlier-panel-note">Generate AI research to transform the surfaced videos into theme cards, title observations, repeatable angles, and next-step recommendations.</div>',

@@ -32,6 +32,13 @@ APP_THEME_CSS = """
     --app-radius-md: 18px;
     --app-radius-pill: 999px;
     --app-control-height: 54px;
+    --app-page-width: 1240px;
+    --app-command-width: 1040px;
+    --app-section-width: 1160px;
+    --app-gap-sm: 12px;
+    --app-gap-md: 16px;
+    --app-gap-lg: 32px;
+    --app-section-pad: 20px;
 
     /* Backwards-compatible aliases for existing page-level CSS */
     --yt-red: #8B5CF6;
@@ -78,8 +85,11 @@ html, body, [data-testid="stAppViewContainer"] {
 }
 
 .block-container {
+    max-width: var(--app-page-width) !important;
     padding-top: 2rem;
     padding-bottom: 3rem;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
 }
 
 [data-testid="stVerticalBlockBorderWrapper"] {
@@ -370,6 +380,84 @@ button[kind="secondaryFormSubmit"]:hover {
     box-shadow: var(--app-shadow);
     backdrop-filter: blur(12px);
     margin-bottom: 1.25rem;
+}
+
+.app-section-shell {
+    max-width: var(--app-section-width);
+    margin: 0 auto var(--app-gap-lg);
+}
+
+.app-command-shell {
+    max-width: var(--app-command-width);
+    margin: 0 auto var(--app-gap-lg);
+}
+
+.app-section-intro {
+    margin-bottom: var(--app-gap-md);
+}
+
+.app-section-title {
+    font-family: "Space Grotesk", "Plus Jakarta Sans", system-ui, sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.06;
+    letter-spacing: -0.03em;
+    color: var(--app-text);
+    margin-bottom: 0.22rem;
+}
+
+.app-section-copy {
+    color: var(--app-text-secondary);
+    font-size: 13px;
+    line-height: 1.55;
+    max-width: 760px;
+}
+
+.app-subsection-label {
+    font-size: 11px;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--app-text-tertiary);
+    margin: 0.2rem 0 0.7rem;
+}
+
+.app-meta-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    margin-bottom: 1rem;
+}
+
+.app-meta-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.app-meta-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.36rem;
+    padding: 0.44rem 0.72rem;
+    border-radius: var(--app-radius-pill);
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--app-text-secondary);
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.app-meta-pill strong {
+    color: var(--app-text);
+    font-weight: 700;
+}
+
+.app-meta-pill--state {
+    background: rgba(139, 92, 246, 0.12);
+    border-color: rgba(196, 181, 253, 0.18);
 }
 
 .keyword-chip {
