@@ -27,7 +27,7 @@ def render_sidebar() -> str:
                     <span style="font-size:14px;font-weight:800;color:#FFFFFF;">▶</span>
                 </div>
                 <div>
-                    <div style="font-weight:700;font-size:14px;letter-spacing:0.08em;text-transform:uppercase;color:#FFFFFF;">YouTube IP V3</div>
+                    <div style="font-weight:700;font-size:14px;letter-spacing:0.08em;text-transform:uppercase;color:#FFFFFF;">YouTube IP V4</div>
                     <div style="font-size:11px;color:#B8C1DA;">Creator Intelligence Suite</div>
                 </div>
             </div>
@@ -88,7 +88,7 @@ def render_sidebar() -> str:
             """
             <div style="font-size:10px;color:#8993B2;margin-top:0.6rem;line-height:1.4;">
                 <strong>Streamlit-ready deployment</strong><br/>
-                Repo: royayushkr/Youtube-IP-V3
+                Repo: royayushkr/Youtube-IP-V4
             </div>
             """,
             unsafe_allow_html=True,

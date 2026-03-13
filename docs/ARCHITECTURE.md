@@ -1,54 +1,65 @@
 # System Architecture
 
-This document captures the high-level architecture, core components, and data flow.
+This repository now follows a runtime-first layout.
 
-## End-to-End Flow
+## Active Runtime Surface
+
+The deployed Streamlit app is built from:
+
+- `streamlit_app.py`
+- `dashboard/`
+- `src/services/`
+- `src/utils/`
+- `src/llm_integration/thumbnail_generator.py`
+- `data/youtube api data/`
+- `data/assistant/`
+- `outputs/assistant/`
+- `outputs/channel_insights/`
+
+## Runtime Flow
 ```mermaid
 flowchart LR
-    A[YouTube Data API v3] --> B[Raw Data Store]
-    C[Public Captions] --> B
-    D[Google Trends (Optional)] --> B
-    B --> E[Data Cleaning & Feature Engineering]
-    E --> F[Topic Modeling - BERTopic]
-    E --> G[Engagement Analytics]
-    F --> H[Semantic Themes & Clusters]
-    G --> I[High-Engagement Patterns]
-    H --> J[LLM Strategy Generator]
-    I --> J
-    J --> K[Streamlit Dashboard]
-    K --> L[Recommendations & Insights]
+    A["YouTube Data API v3"] --> B["Active Service Layer"]
+    C["Google OAuth + YouTube Analytics (Optional)"] --> B
+    D["Curated Assistant Knowledge"] --> E["Sidebar Assistant"]
+    B --> F["Streamlit Views"]
+    E --> F
+    F --> G["Creator Insights, Tools, Outlier Research, Channel Diagnostics"]
 ```
 
-## Component Responsibilities
+## Runtime Modules
 ```mermaid
 flowchart TB
-    subgraph Data_Collection
-        A1[channel_fetcher.py]
-        A2[youtube_api_client.py]
-        A3[youtube_scraper.py]
+    subgraph UI
+        A1["dashboard/app.py"]
+        A2["dashboard/components/sidebar.py"]
+        A3["dashboard/views/*"]
     end
-    subgraph Processing
-        B1[text_cleaner.py]
-        B2[feature_engineering.py]
+    subgraph Services
+        B1["src/services/public_channel_service.py"]
+        B2["src/services/channel_insights_service.py"]
+        B3["src/services/outliers_finder.py"]
+        B4["src/services/youtube_tools.py"]
+        B5["src/services/assistant_service.py"]
     end
-    subgraph Modeling
-        C1[bertopic_trainer.py]
-        C2[topic_model.py]
-    end
-    subgraph LLM
-        D1[gpt4_client.py]
-        D2[content_generator.py]
-    end
-    subgraph Delivery
-        E1[Streamlit App]
-        E2[Visualizations]
+    subgraph Utilities
+        C1["src/utils/api_keys.py"]
+        C2["src/utils/channel_parser.py"]
+        C3["src/utils/file_utils.py"]
+        C4["src/utils/text_normalization.py"]
     end
 
-    Data_Collection --> Processing --> Modeling --> LLM --> Delivery
+    Services --> UI
+    Utilities --> Services
 ```
 
-## Data Artifacts
-- **Raw Data:** `data/raw/`
-- **Processed Data:** `data/processed/`
-- **Models:** `outputs/models/`
-- **Visuals and Reports:** `outputs/figures/`, `outputs/reports/`
+## Archived Research Material
+
+Historical research assets that are not part of the deployed app now live under:
+
+- `research_archive/src/`
+- `research_archive/data/`
+- `research_archive/docs/`
+- `research_archive/notebooks/`
+
+These materials are preserved for reference, but they are not part of the runtime deployment contract.

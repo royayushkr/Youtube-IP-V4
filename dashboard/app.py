@@ -13,7 +13,7 @@ from dashboard.views import channel_analysis, channel_insights, outlier_finder, 
 
 
 st.set_page_config(
-    page_title="YouTube IP V3",
+    page_title="YouTube IP V4",
     page_icon="📺",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -22,8 +22,8 @@ st.set_page_config(
 def _render_hero() -> None:
     st.markdown(
         """
-        <div class="fade-in" style="margin-bottom: 1.0rem;">
-            <div class="yt-page-title">YouTube IP V3</div>
+            <div class="fade-in" style="margin-bottom: 1.0rem;">
+            <div class="yt-page-title">YouTube IP V4</div>
             <div class="yt-page-subtitle">
                 Cross-channel analytics, benchmarking, and AI-assisted planning for YouTube creators.
             </div>
@@ -67,7 +67,7 @@ else:
         ```
 
         ### Streamlit Cloud Settings
-        - Repo: `royayushkr/Youtube-IP-V3`
+        - Repo: `royayushkr/Youtube-IP-V4`
         - Branch: `main`
         - Main file path: `streamlit_app.py`
 

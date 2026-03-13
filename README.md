@@ -1,10 +1,8 @@
-# YouTube IP V3
+# YouTube IP V4
 
-YouTube IP V3 is a Streamlit application for YouTube research, benchmarking, live channel analysis, outlier discovery, and AI-assisted planning. It combines bundled CSV datasets with live YouTube Data API requests and optional Gemini/OpenAI generation so one app can cover historical benchmarking, channel diagnostics, idea research, and creative asset prototyping.
+YouTube IP V4 is a Streamlit application for YouTube research, benchmarking, live channel analysis, outlier discovery, creator workflow tooling, and AI-assisted planning. It combines bundled CSV datasets with live YouTube Data API requests and optional Gemini/OpenAI generation so one app can cover historical benchmarking, channel diagnostics, idea research, creator support, and creative asset prototyping.
 
-Live app:
-
-- https://youtube-ip-v3.streamlit.app/
+Deployment target depends on the repo and branch you choose. Use the deployment section below for the current Streamlit setup.
 
 This README documents the current deployed app as it exists in this repository, including:
 
@@ -409,13 +407,15 @@ This is the practical repository layout, not just the nominal one:
 │       └── tools.py                 # Standalone YouTube tools page
 ├── data/
 │   └── youtube api data/            # Bundled CSV datasets used by the app
-├── data/assistant/                  # Curated assistant knowledge records
+│   └── assistant/                   # Curated assistant knowledge records
 ├── docs/
-│   ├── ARCHITECTURE.md              # Original architecture note
+│   ├── ARCHITECTURE.md              # Runtime-first architecture note
 │   └── PROJECT_BRIEF.md             # Original project brief
 ├── outputs/
-│   └── thumbnails/                  # Generated image outputs
-│   └── assistant/                   # SQLite cache for assistant answers/feedback
+│   ├── assistant/                   # SQLite cache for assistant answers/feedback
+│   ├── channel_insights/            # SQLite snapshot store for tracked channels
+│   └── thumbnails/                  # Generated thumbnail outputs (gitignored)
+├── research_archive/                # Historical research code, notebooks, docs, and datasets
 ├── scripts/
 │   ├── yt_api_smoketest.py          # Rich YouTube API smoke test
 │   ├── build_*_dataset.py           # Dataset builder scripts
@@ -423,10 +423,7 @@ This is the practical repository layout, not just the nominal one:
 ├── src/
 │   ├── services/                    # Active outlier, tools, and AI service layer
 │   ├── utils/                       # API-key management, file helpers, and shared utilities
-│   ├── llm_integration/             # Thumbnail generation wrapper
-│   ├── data_collection/             # Mostly legacy / empty scaffolding
-│   ├── data_processing/             # Partial older scaffolding
-│   └── modeling/                    # Partial older scaffolding
+│   └── llm_integration/             # Thumbnail generation wrapper
 ├── tests/
 │   ├── integration/                 # Integration tests
 │   └── unit/                        # Unit tests
@@ -435,7 +432,7 @@ This is the practical repository layout, not just the nominal one:
 └── .streamlit/config.toml           # Theme config
 ```
 
-## What Is Active Versus Historical Scaffolding
+## What Is Active Versus Archived Research Material
 
 This repo has evolved over time. The currently deployed app does **not** use every folder equally.
 
@@ -461,6 +458,7 @@ This repo has evolved over time. The currently deployed app does **not** use eve
 - `data/youtube api data/`
 - `data/assistant/`
 - `outputs/channel_insights/`
+- `outputs/assistant/`
 - `tests/unit/test_outliers_finder.py`
 - `tests/unit/test_outlier_ai.py`
 - `tests/integration/test_pipeline.py`
@@ -520,15 +518,17 @@ The Assistant is intentionally retrieval-first to reduce token cost and improve 
 - OAuth state is session-scoped in V1, so users may need to reconnect after a Streamlit restart or redeploy
 - There is still no authenticated YouTube Analytics scheduling or background refresh worker in Streamlit alone
 
-### Present in the repo but only partially used or currently inactive
+### Archived for reference
 
-- `src/data_collection/`
-- `src/modeling/`
-- `src/llm_integration/content_generator.py`
-- `src/llm_integration/gpt4_client.py`
-- parts of `src/data_processing/`
+Historical research material now lives under `research_archive/`, including:
 
-Several of these files are empty or legacy placeholders from the original research-project structure. The README reflects the code that powers the live app today, not every historical idea in the repo.
+- legacy ML and data-collection code
+- research notebooks
+- processed modeling datasets
+- ML backend notes and supporting docs
+- extra raw datasets not needed by the deployed Streamlit app
+
+This keeps the runtime tree app-focused without deleting the older research work.
 
 ## Bundled Data Assets
 
@@ -874,7 +874,7 @@ It exposes controls for:
 - background
 - output format
 
-Generated files are saved under `outputs/thumbnails/`.
+Generated files are saved under `outputs/thumbnails/`. The directory is intentionally kept out of Git so generated images do not accumulate in the repo.
 
 ## Tools Page Notes
 

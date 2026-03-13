@@ -1582,7 +1582,7 @@ def _openai_generate_text(openai_key: str, model: str, prompt: str) -> str:
                 "role": "system",
                 "content": (
                     "You are an advanced YouTube strategist supporting the "
-                    "YouTube IP V3 creator analytics platform. "
+                    "YouTube IP V4 creator analytics platform. "
                     "Keep outputs concise, structured, and actionable."
                 ),
             },
@@ -3048,7 +3048,7 @@ def render() -> None:
         <div class="ytuber-hero">
             <div class="ytuber-brand-row">
                 <span class="ytuber-brand-dot"></span>
-                YouTube IP V3
+                YouTube IP V4
             </div>
             <div class="ytuber-kicker">YouTube Search And Creator Intelligence</div>
             <div class="ytuber-title">Search Any YouTube Channel and Open a Live Growth Workspace.</div>

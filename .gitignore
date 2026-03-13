@@ -26,6 +26,10 @@ outputs/figures/
 outputs/logs/
 outputs/models/
 outputs/reports/
+outputs/thumbnails/*
+!outputs/thumbnails/.gitkeep
+outputs/assistant/*.db
+outputs/channel_insights/*.db
 
 # Local configs
 config/*.local.yaml
