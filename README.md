@@ -2,6 +2,10 @@
 
 YouTube IP V4 is a Streamlit application for YouTube research, benchmarking, live channel analysis, outlier discovery, creator workflow tooling, and AI-assisted planning. It combines bundled CSV datasets with live YouTube Data API requests and optional Gemini/OpenAI generation so one app can cover historical benchmarking, channel diagnostics, idea research, creator support, and creative asset prototyping.
 
+Live app:
+
+- [youtube-ip-v4.streamlit.app](https://youtube-ip-v4.streamlit.app/)
+
 Deployment target depends on the repo and branch you choose. Use the deployment section below for the current Streamlit setup.
 
 This README documents the current deployed app as it exists in this repository, including:
@@ -692,6 +696,7 @@ This repo is structured to deploy directly from GitHub to Streamlit Community Cl
 
 ### Streamlit app settings
 
+- Live app: [youtube-ip-v4.streamlit.app](https://youtube-ip-v4.streamlit.app/)
 - Repo: `royayushkr/Youtube-IP-V4`
 - Branch: `main`
 - Main file path: `streamlit_app.py`
