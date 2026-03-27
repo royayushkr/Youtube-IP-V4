@@ -1,0 +1,10 @@
+{
+  "bundle_version": "2026.03.27",
+  "artifact_url": "https://github.com/matt-foor/purdue-youtube-ip/raw/asher/outputs/models/bertopic_model",
+  "sha256": "0fb286d360a1a83f55208da62278a69c3d95882ac81803172c9816b3ff8d60a8",
+  "size_bytes": 262585751,
+  "model_type": "bertopic_global",
+  "bertopic_version": "unknown",
+  "python_version": "unknown",
+  "load_subpath": "bundle/bertopic_model"
+}

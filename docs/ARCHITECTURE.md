@@ -63,3 +63,11 @@ Historical research assets that are not part of the deployed app now live under:
 - `research_archive/notebooks/`
 
 These materials are preserved for reference, but they are not part of the runtime deployment contract.
+
+## Branch Guardrail
+
+The `asher` branch is treated as a research-artifact branch, not a deploy branch.
+
+- Do not merge its Git LFS rules or BERTopic model artifacts into `youtube-ip-v4`.
+- The deployed app may use externally hosted optional BERTopic bundles, but not the branch's Git LFS artifacts directly.
+- Any topic-model integration must stay optional, artifact-light by default, and outside app boot.

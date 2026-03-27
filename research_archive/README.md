@@ -19,3 +19,9 @@ The deployed app continues to use:
 - `data/assistant/`
 
 This archive is kept for reference and future research reuse, but it is not part of the runtime import surface or deployment contract.
+
+Branch note:
+
+- `asher` is preserved as a research-oriented branch because it adds Git LFS-tracked BERTopic model artifacts.
+- Those artifacts are intentionally excluded from the deployable V4 branch.
+- If they are ever used again, they should be wired through an optional offline workflow rather than the default Streamlit runtime.

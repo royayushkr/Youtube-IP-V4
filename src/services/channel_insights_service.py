@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from src.services.channel_idea_service import build_grounded_idea_bundle, maybe_generate_ai_overlay
+from src.services.model_artifact_service import get_bertopic_artifact_status
 from src.services.channel_snapshot_store import (
     DEFAULT_CHANNEL_INSIGHTS_DB,
     get_tracked_channel,
@@ -17,6 +18,7 @@ from src.services.channel_snapshot_store import (
     upsert_tracked_channel,
 )
 from src.services.public_channel_service import PublicChannelWorkspace, ensure_public_channel_frame, load_public_channel_workspace
+from src.services.topic_model_runtime import apply_optional_topic_model
 from src.services.topic_analysis_service import (
     add_channel_video_features,
     assign_topic_labels,
@@ -28,6 +30,10 @@ from src.services.topic_analysis_service import (
 )
 from src.services.youtube_owner_analytics_service import OwnerAnalyticsBundle, fetch_owner_channel_analytics
 from src.utils.channel_parser import normalize_channel_input
+
+
+TOPIC_MODE_HEURISTIC = "heuristic"
+TOPIC_MODE_BERTOPIC_OPTIONAL = "bertopic_optional"
 
 
 def _iso_now() -> str:
@@ -71,6 +77,63 @@ def _score_videos(channel_df: pd.DataFrame) -> pd.DataFrame:
     score_series = sum(series * weight for series, weight in weighted_parts) / total_weight * 100
     df["performance_score"] = score_series.clip(0, 100)
     return df
+
+
+def _normalize_topic_mode(topic_mode: str) -> str:
+    if str(topic_mode or "").strip().lower() == TOPIC_MODE_BERTOPIC_OPTIONAL:
+        return TOPIC_MODE_BERTOPIC_OPTIONAL
+    return TOPIC_MODE_HEURISTIC
+
+
+def _apply_heuristic_topics(channel_df: pd.DataFrame) -> pd.DataFrame:
+    df = assign_topic_labels(channel_df)
+    df["topic_source"] = "heuristic"
+    df["model_topic_id"] = pd.NA
+    df["model_topic_label_raw"] = ""
+    df["model_topic_label"] = ""
+    return df
+
+
+def _apply_requested_topic_mode(channel_df: pd.DataFrame, topic_mode: str) -> tuple[pd.DataFrame, Dict[str, Any]]:
+    requested_mode = _normalize_topic_mode(topic_mode)
+    if requested_mode == TOPIC_MODE_HEURISTIC:
+        return _apply_heuristic_topics(channel_df), {
+            "topic_mode_requested": TOPIC_MODE_HEURISTIC,
+            "topic_mode_used": TOPIC_MODE_HEURISTIC,
+            "model_bundle_version": "",
+            "model_available": False,
+            "model_failure_reason": "",
+            "model_status": "disabled",
+            "topic_model_message": "Using the default heuristic topic clustering flow.",
+        }
+
+    inference = apply_optional_topic_model(channel_df)
+    if inference.success:
+        topic_df = pd.DataFrame(inference.topic_rows)
+        merged = channel_df.merge(topic_df, on="video_id", how="left")
+        merged["primary_topic"] = merged["model_topic_label"].fillna("").astype(str).replace("", "Unassigned")
+        merged["topic_labels"] = merged["primary_topic"].apply(lambda value: [str(value)])
+        merged["topic_source"] = merged["topic_source"].fillna("bertopic_global")
+        return merged, {
+            "topic_mode_requested": TOPIC_MODE_BERTOPIC_OPTIONAL,
+            "topic_mode_used": TOPIC_MODE_BERTOPIC_OPTIONAL,
+            "model_bundle_version": inference.bundle_version,
+            "model_available": True,
+            "model_failure_reason": "",
+            "model_status": inference.status,
+            "topic_model_message": inference.message or "Using the optional BERTopic model.",
+        }
+
+    fallback_df = _apply_heuristic_topics(channel_df)
+    return fallback_df, {
+        "topic_mode_requested": TOPIC_MODE_BERTOPIC_OPTIONAL,
+        "topic_mode_used": TOPIC_MODE_HEURISTIC,
+        "model_bundle_version": inference.bundle_version,
+        "model_available": False,
+        "model_failure_reason": inference.failure_reason,
+        "model_status": inference.status,
+        "topic_model_message": "BERTopic beta mode was requested, but the page fell back to heuristic topics.",
+    }
 
 
 def _merge_owner_video_metrics(channel_df: pd.DataFrame, owner_bundle: OwnerAnalyticsBundle) -> pd.DataFrame:
@@ -180,6 +243,7 @@ def _build_summary(
     duration_metrics: pd.DataFrame,
     title_pattern_metrics: pd.DataFrame,
     outliers: pd.DataFrame,
+    topic_mode_metadata: Dict[str, Any],
     owner_bundle: Optional[OwnerAnalyticsBundle] = None,
 ) -> Dict[str, Any]:
     metrics = _format_metrics(topic_metrics, duration_metrics, title_pattern_metrics)
@@ -195,6 +259,13 @@ def _build_summary(
         "shorts_ratio": float(channel_df["is_short"].mean()) if not channel_df.empty else 0.0,
         "recent_outlier_count": int(len(outliers)),
         **metrics,
+        "topic_mode_requested": topic_mode_metadata.get("topic_mode_requested", TOPIC_MODE_HEURISTIC),
+        "topic_mode_used": topic_mode_metadata.get("topic_mode_used", TOPIC_MODE_HEURISTIC),
+        "topic_model_status": topic_mode_metadata.get("model_status", "disabled"),
+        "topic_model_available": bool(topic_mode_metadata.get("model_available", False)),
+        "topic_model_bundle_version": topic_mode_metadata.get("model_bundle_version", ""),
+        "topic_model_failure_reason": topic_mode_metadata.get("model_failure_reason", ""),
+        "topic_model_message": topic_mode_metadata.get("topic_model_message", ""),
     }
     if owner_bundle and owner_bundle.available:
         owner_summary = owner_bundle.summary
@@ -234,10 +305,12 @@ def _insight_payload(
     underperformers: pd.DataFrame,
     summary: Dict[str, Any],
     recommendations: Dict[str, Any],
+    topic_mode_metadata: Dict[str, Any],
     owner_bundle: Optional[OwnerAnalyticsBundle] = None,
 ) -> Dict[str, Any]:
     return {
         "summary": summary,
+        "topic_mode_metadata": topic_mode_metadata,
         "topic_metrics": topic_metrics.to_dict(orient="records"),
         "duration_metrics": duration_metrics.to_dict(orient="records"),
         "title_pattern_metrics": title_pattern_metrics.to_dict(orient="records"),
@@ -258,6 +331,7 @@ def refresh_channel_insights(
     channel_input: str,
     *,
     force_refresh: bool = False,
+    topic_mode: str = TOPIC_MODE_HEURISTIC,
     db_path: Path = DEFAULT_CHANNEL_INSIGHTS_DB,
     owner_credentials: Any = None,
 ) -> Dict[str, Any]:
@@ -265,7 +339,7 @@ def refresh_channel_insights(
     workspace = load_public_channel_workspace(parsed_input.lookup_value, force_refresh=force_refresh)
     channel_df = ensure_public_channel_frame(workspace.channel_df)
     channel_df = add_channel_video_features(channel_df)
-    channel_df = assign_topic_labels(channel_df)
+    channel_df, topic_mode_metadata = _apply_requested_topic_mode(channel_df, topic_mode)
 
     owner_bundle: Optional[OwnerAnalyticsBundle] = None
     if owner_credentials is not None:
@@ -296,6 +370,7 @@ def refresh_channel_insights(
         duration_metrics=duration_metrics,
         title_pattern_metrics=title_pattern_metrics,
         outliers=outliers,
+        topic_mode_metadata=topic_mode_metadata,
         owner_bundle=owner_bundle,
     )
 
@@ -353,6 +428,7 @@ def refresh_channel_insights(
             underperformers=underperformers,
             summary=summary,
             recommendations=recommendations,
+            topic_mode_metadata=topic_mode_metadata,
             owner_bundle=owner_bundle,
         ),
         db_path=db_path,
@@ -385,6 +461,8 @@ def load_channel_insights(channel_id: str, *, db_path: Path = DEFAULT_CHANNEL_IN
         "snapshot_at": snapshot["snapshot_at"],
         "source": snapshot["source"],
         "summary": summary,
+        "topic_mode_metadata": insights.get("topic_mode_metadata", {}),
+        "topic_artifact_status": get_bertopic_artifact_status(),
         "history_delta": history_delta,
         "videos_df": videos_df,
         "topic_metrics_df": topic_metrics_df,

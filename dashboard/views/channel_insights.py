@@ -15,10 +15,13 @@ from dashboard.components.visualizations import (
     styled_keyword_chips,
 )
 from src.services.channel_insights_service import (
+    TOPIC_MODE_BERTOPIC_OPTIONAL,
+    TOPIC_MODE_HEURISTIC,
     list_connected_channels,
     load_channel_insights,
     refresh_channel_insights,
 )
+from src.services.model_artifact_service import get_bertopic_artifact_status
 from src.services.google_oauth_service import (
     build_google_authorization_url,
     clear_google_oauth_session,
@@ -35,6 +38,7 @@ STATE_KEYS = (
     "channel_insights_selected_channel",
     "channel_insights_input",
     "channel_insights_force_refresh",
+    "channel_insights_topic_mode",
     "channel_insights_error",
 )
 
@@ -245,6 +249,25 @@ def _queue_outlier_finder_theme(theme: str, channel_title: str) -> None:
     )
 
 
+def _topic_mode_label(topic_mode: str) -> str:
+    if topic_mode == TOPIC_MODE_BERTOPIC_OPTIONAL:
+        return "Model-Backed Topics (Beta)"
+    return "Heuristic Topics"
+
+
+def _artifact_status_label(state: str) -> str:
+    mapping = {
+        "disabled": "Unavailable",
+        "unconfigured": "Unavailable",
+        "download_required": "Download Required",
+        "ready": "Ready",
+        "invalid": "Failed / Fallback Active",
+        "load_failed": "Failed / Fallback Active",
+        "transform_failed": "Failed / Fallback Active",
+    }
+    return mapping.get(str(state or "").strip().lower(), "Unavailable")
+
+
 def _render_hero() -> None:
     st.markdown(
         """
@@ -300,6 +323,7 @@ def _render_connect_card(connected_channels: List[Dict[str, Any]]) -> None:
     credentials = get_google_credentials()
     profile = get_google_profile()
     owned_channels = _owned_channels() if credentials is not None else []
+    artifact_status = get_bertopic_artifact_status()
 
     config_cols = st.columns([1.45, 1], gap="large")
     with config_cols[0]:
@@ -328,6 +352,7 @@ def _render_connect_card(connected_channels: List[Dict[str, Any]]) -> None:
                         payload = refresh_channel_insights(
                             channel_input.strip(),
                             force_refresh=force_refresh,
+                            topic_mode=st.session_state.get("channel_insights_topic_mode", TOPIC_MODE_HEURISTIC),
                             owner_credentials=credentials,
                         )
                     except Exception as exc:
@@ -382,6 +407,7 @@ def _render_connect_card(connected_channels: List[Dict[str, Any]]) -> None:
                         try:
                             payload = refresh_channel_insights(
                                 owned_choice["channel_id"],
+                                topic_mode=st.session_state.get("channel_insights_topic_mode", TOPIC_MODE_HEURISTIC),
                                 owner_credentials=credentials,
                             )
                         except Exception as exc:
@@ -438,12 +464,44 @@ def _render_connect_card(connected_channels: List[Dict[str, Any]]) -> None:
             unsafe_allow_html=True,
         )
 
+        st.markdown(
+            """
+            <div class="ci-card" style="margin-top:0.85rem;">
+                <div class="ci-card-title">Experimental Topic Model</div>
+                <div class="ci-card-copy">
+                    Keep the default heuristic topic flow for the safest path, or switch to the optional BERTopic beta when artifact settings are configured.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.selectbox(
+            "Topic Analysis Mode",
+            options=[TOPIC_MODE_HEURISTIC, TOPIC_MODE_BERTOPIC_OPTIONAL],
+            key="channel_insights_topic_mode",
+            format_func=_topic_mode_label,
+        )
+        st.caption(f"Artifact Status: {_artifact_status_label(artifact_status.state)}")
+        if artifact_status.state == "ready":
+            st.success(artifact_status.message or "BERTopic bundle is ready.")
+        elif artifact_status.state == "download_required":
+            st.info(artifact_status.message or "The BERTopic bundle will download when you run the beta mode.")
+        elif artifact_status.state in {"invalid"}:
+            st.warning(artifact_status.failure_reason or artifact_status.message or "BERTopic beta mode is currently unavailable.")
+        else:
+            st.caption(artifact_status.message or "The heuristic mode remains the default until artifact configuration is complete.")
+
 
 def _render_summary_action_row(payload: Dict[str, Any]) -> None:
     channel = payload["channel"]
     summary = payload["summary"]
     credentials = get_google_credentials()
     owner_metrics_active = bool(summary.get("owner_metrics_available"))
+    topic_mode_used = summary.get("topic_mode_used", TOPIC_MODE_HEURISTIC)
+    topic_mode_requested = summary.get("topic_mode_requested", TOPIC_MODE_HEURISTIC)
+    topic_model_message = summary.get("topic_model_message", "")
+    topic_model_failure_reason = summary.get("topic_model_failure_reason", "")
+    artifact_status = payload.get("topic_artifact_status") or get_bertopic_artifact_status()
     action_cols = st.columns([2.2, 1.1, 1], gap="large")
     with action_cols[0]:
         st.markdown(
@@ -453,7 +511,8 @@ def _render_summary_action_row(payload: Dict[str, Any]) -> None:
                 <div class="ci-card-title" style="margin-top:0.65rem;">{escape(channel['channel_title'])}</div>
                 <div class="ci-card-copy">
                     Latest Snapshot: {escape(payload['snapshot_at'])}<br/>
-                    {'Owner-only metrics were blended into this snapshot using Google OAuth.' if owner_metrics_active else 'Public channel analytics only. Connect Google OAuth if you want owner-only watch-time, retention, and thumbnail signals.'}
+                    {'Owner-only metrics were blended into this snapshot using Google OAuth.' if owner_metrics_active else 'Public channel analytics only. Connect Google OAuth if you want owner-only watch-time, retention, and thumbnail signals.'}<br/>
+                    Topic Mode Used: {escape(_topic_mode_label(topic_mode_used))}
                 </div>
             </div>
             """,
@@ -466,6 +525,7 @@ def _render_summary_action_row(payload: Dict[str, Any]) -> None:
                     fresh_payload = refresh_channel_insights(
                         channel["channel_id"],
                         force_refresh=False,
+                        topic_mode=st.session_state.get("channel_insights_topic_mode", TOPIC_MODE_HEURISTIC),
                         owner_credentials=credentials,
                     )
                 except Exception as exc:
@@ -476,6 +536,36 @@ def _render_summary_action_row(payload: Dict[str, Any]) -> None:
                     st.rerun()
     with action_cols[2]:
         st.link_button("Open Channel", channel["canonical_url"], use_container_width=True)
+
+    st.markdown(
+        f"""
+        <div class="ci-card" style="margin-top:0.75rem;">
+            <div class="ci-card-title">Experimental Topic Model</div>
+            <div class="ci-summary-grid">
+                <div class="ci-summary-item">
+                    <div class="ci-summary-label">Requested Mode</div>
+                    <div class="ci-summary-value">{escape(_topic_mode_label(topic_mode_requested))}</div>
+                </div>
+                <div class="ci-summary-item">
+                    <div class="ci-summary-label">Applied Mode</div>
+                    <div class="ci-summary-value">{escape(_topic_mode_label(topic_mode_used))}</div>
+                </div>
+                <div class="ci-summary-item">
+                    <div class="ci-summary-label">Artifact Status</div>
+                    <div class="ci-summary-value">{escape(_artifact_status_label(getattr(artifact_status, 'state', 'disabled')))}</div>
+                </div>
+                <div class="ci-summary-item">
+                    <div class="ci-summary-label">Bundle Version</div>
+                    <div class="ci-summary-value">{escape(str(summary.get('topic_model_bundle_version', '') or 'Not Loaded'))}</div>
+                </div>
+            </div>
+            <div class="ci-note" style="margin-top:0.85rem;">{escape(topic_model_message or 'The heuristic topic flow remains the fallback when BERTopic is unavailable.')}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if topic_mode_requested == TOPIC_MODE_BERTOPIC_OPTIONAL and topic_mode_used != TOPIC_MODE_BERTOPIC_OPTIONAL:
+        st.warning(topic_model_failure_reason or "BERTopic beta mode could not run for this snapshot, so the page fell back to heuristic topics.")
 
     deltas = payload.get("history_delta", {})
     kpi_row(
@@ -570,6 +660,10 @@ def _render_overview_tab(payload: Dict[str, Any]) -> None:
                         <div class="ci-summary-value">{'Connected' if summary.get('owner_metrics_available') else 'Public Only'}</div>
                     </div>
                     <div class="ci-summary-item">
+                        <div class="ci-summary-label">Topic Source</div>
+                        <div class="ci-summary-value">{escape(_topic_mode_label(summary.get('topic_mode_used', TOPIC_MODE_HEURISTIC)))}</div>
+                    </div>
+                    <div class="ci-summary-item">
                         <div class="ci-summary-label">Thumbnail CTR</div>
                         <div class="ci-summary-value">{_format_ratio_pct(summary.get('owner_thumbnail_ctr', 0)) if summary.get('owner_metrics_available') else 'Connect OAuth'}</div>
                     </div>
@@ -631,6 +725,8 @@ def _render_overview_tab(payload: Dict[str, Any]) -> None:
 
         if summary.get("owner_note"):
             st.caption(summary["owner_note"])
+        if summary.get("topic_mode_requested") == TOPIC_MODE_BERTOPIC_OPTIONAL and summary.get("topic_mode_used") != TOPIC_MODE_BERTOPIC_OPTIONAL:
+            st.caption(summary.get("topic_model_failure_reason") or "BERTopic beta mode fell back to the heuristic topic flow.")
 
 
 def _render_topic_trends_tab(payload: Dict[str, Any]) -> None:

@@ -1,7 +1,23 @@
 """Service layer helpers for interactive product modules."""
 
 from src.services.channel_idea_service import ChannelIdeaBundle, IdeaSuggestion, ThemeRecommendation, build_grounded_idea_bundle, maybe_generate_ai_overlay
-from src.services.channel_insights_service import list_connected_channels, load_channel_insights, refresh_channel_insights
+from src.services.channel_insights_service import (
+    TOPIC_MODE_BERTOPIC_OPTIONAL,
+    TOPIC_MODE_HEURISTIC,
+    list_connected_channels,
+    load_channel_insights,
+    refresh_channel_insights,
+)
+from src.services.model_artifact_service import (
+    MODEL_TYPE_BERTOPIC_GLOBAL,
+    ModelArtifactManifest,
+    ModelArtifactStatus,
+    ensure_bertopic_artifact_ready,
+    fetch_bertopic_manifest,
+    get_bertopic_artifact_status,
+    get_model_artifact_manifest_url,
+    model_artifacts_enabled,
+)
 from src.services.channel_snapshot_store import (
     DEFAULT_CHANNEL_INSIGHTS_DB,
     get_tracked_channel,
@@ -41,6 +57,7 @@ from src.services.topic_analysis_service import (
     normalize_topic_token,
     tokenize_topic_text,
 )
+from src.services.topic_model_runtime import TopicModelInferenceResult, apply_optional_topic_model, build_bertopic_inference_text
 from src.services.cache_service import CachedAnswerRecord, fetch_exact_cached_answer, initialize_cache_db, list_cached_answers_for_scope, store_answer
 from src.services.outlier_ai import InsightCard, OutlierAIReport, generate_outlier_ai_report
 from src.services.outliers_finder import (
@@ -88,9 +105,19 @@ __all__ = [
     "ThemeRecommendation",
     "build_grounded_idea_bundle",
     "maybe_generate_ai_overlay",
+    "TOPIC_MODE_HEURISTIC",
+    "TOPIC_MODE_BERTOPIC_OPTIONAL",
     "list_connected_channels",
     "load_channel_insights",
     "refresh_channel_insights",
+    "MODEL_TYPE_BERTOPIC_GLOBAL",
+    "ModelArtifactManifest",
+    "ModelArtifactStatus",
+    "ensure_bertopic_artifact_ready",
+    "fetch_bertopic_manifest",
+    "get_bertopic_artifact_status",
+    "get_model_artifact_manifest_url",
+    "model_artifacts_enabled",
     "DEFAULT_CHANNEL_INSIGHTS_DB",
     "get_tracked_channel",
     "initialize_channel_snapshot_store",
@@ -166,6 +193,9 @@ __all__ = [
     "duration_bucket",
     "normalize_topic_token",
     "tokenize_topic_text",
+    "TopicModelInferenceResult",
+    "apply_optional_topic_model",
+    "build_bertopic_inference_text",
     "PLAYLIST_PREVIEW_LIMIT_DEFAULT",
     "STREAMLIT_DOWNLOAD_LIMIT_BYTES",
     "BatchItemResult",

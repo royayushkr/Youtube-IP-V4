@@ -138,6 +138,7 @@ It can:
 - identify outliers and underperformers within the channel
 - recommend what to double down on, what to avoid, and what to test next
 - generate grounded video-direction suggestions from actual channel data
+- optionally use a beta BERTopic-backed topic mode when an external model manifest and bundle are configured
 
 Code:
 
@@ -149,11 +150,14 @@ Code:
 - `src/services/topic_analysis_service.py`
 - `src/services/youtube_owner_analytics_service.py`
 - `src/services/channel_idea_service.py`
+- `src/services/model_artifact_service.py`
+- `src/services/topic_model_runtime.py`
 - `src/utils/channel_parser.py`
 
 Storage:
 
 - `outputs/channel_insights/channel_insights.db`
+- optional BERTopic runtime cache: `outputs/models/runtime/`
 
 Google OAuth setup for owner metrics:
 
@@ -521,6 +525,7 @@ The Assistant is intentionally retrieval-first to reduce token cost and improve 
 - Channel Insights supports owner-only analytics only when Google OAuth is configured and the connected Google account actually owns the tracked channel
 - OAuth state is session-scoped in V1, so users may need to reconnect after a Streamlit restart or redeploy
 - There is still no authenticated YouTube Analytics scheduling or background refresh worker in Streamlit alone
+- BERTopic beta mode is optional, off by default, and falls back to heuristic topics whenever artifact setup or runtime loading fails
 
 ### Archived for reference
 
@@ -533,6 +538,22 @@ Historical research material now lives under `research_archive/`, including:
 - extra raw datasets not needed by the deployed Streamlit app
 
 This keeps the runtime tree app-focused without deleting the older research work.
+
+### Branch guardrail: `asher` is not a deployable feature branch
+
+The `asher` branch is intentionally **not** merged into `youtube-ip-v4` or deployment `main`.
+
+Current reason:
+
+- its branch diff only adds Git LFS tracking and BERTopic model artifact pointers under `outputs/models/`
+- it does **not** add active Streamlit runtime code, routes, services, tests, or deployment fixes
+- those branch-specific model artifacts are still **not** merged into V4; the deployed app only supports BERTopic through the new optional external bundle workflow and would become heavier and more fragile if the `asher` Git LFS artifacts were merged directly
+
+Deployment rule:
+
+- keep `youtube-ip-v4` as the source of truth for routing, entrypoints, secrets, and Streamlit deployability
+- do not introduce Git LFS model artifacts into the deploy branch
+- model-backed topic support must remain **optional**, externally hosted, graceful when artifacts are missing, and inactive during app boot
 
 ## Bundled Data Assets
 
@@ -596,6 +617,8 @@ Set these in environment variables or Streamlit secrets:
 - `GOOGLE_OAUTH_CLIENT_ID`
 - `GOOGLE_OAUTH_CLIENT_SECRET`
 - `GOOGLE_OAUTH_REDIRECT_URI`
+- `MODEL_ARTIFACTS_ENABLED` (optional)
+- `MODEL_ARTIFACTS_MANIFEST_URL` (optional)
 
 Example Streamlit secrets:
 
@@ -603,6 +626,13 @@ Example Streamlit secrets:
 GOOGLE_OAUTH_CLIENT_ID = "your-google-oauth-client-id"
 GOOGLE_OAUTH_CLIENT_SECRET = "your-google-oauth-client-secret"
 GOOGLE_OAUTH_REDIRECT_URI = "https://your-app.streamlit.app/"
+
+# Optional BERTopic beta settings for Channel Insights
+# MODEL_ARTIFACTS_ENABLED = true
+# MODEL_ARTIFACTS_MANIFEST_URL = "https://raw.githubusercontent.com/royayushkr/Youtube-IP-V4/main/data/model_manifests/bertopic_manifest_2026.03.27.json"
+# MODEL_ARTIFACTS_CACHE_DIR = "outputs/models/runtime"
+# MODEL_ARTIFACTS_DOWNLOAD_TIMEOUT_SECONDS = 300
+# MODEL_ARTIFACTS_MAX_SIZE_MB = 512
 ```
 
 Important:
@@ -619,6 +649,7 @@ Important:
 - deduplicates the final list
 - stores a session-level cursor for each provider
 - retries operations across all configured keys when failures are retryable
+- leaves Channel Insights on heuristic topics when the optional BERTopic settings are absent
 
 This matters most for:
 
@@ -676,6 +707,14 @@ Reference file:
 
 - `.streamlit/secrets.toml.example`
 
+Optional BERTopic beta env vars are also supported:
+
+- `MODEL_ARTIFACTS_ENABLED`
+- `MODEL_ARTIFACTS_MANIFEST_URL`
+- `MODEL_ARTIFACTS_CACHE_DIR`
+- `MODEL_ARTIFACTS_DOWNLOAD_TIMEOUT_SECONDS`
+- `MODEL_ARTIFACTS_MAX_SIZE_MB`
+
 ### Run the app
 
 Preferred:
@@ -725,6 +764,10 @@ OPENAI_API_KEYS = ["your_openai_key_1", "your_openai_key_2"]
 GOOGLE_OAUTH_CLIENT_ID = "your-google-oauth-client-id"
 GOOGLE_OAUTH_CLIENT_SECRET = "your-google-oauth-client-secret"
 GOOGLE_OAUTH_REDIRECT_URI = "https://your-app-name.streamlit.app/"
+
+# Optional BERTopic beta settings
+# MODEL_ARTIFACTS_ENABLED = true
+# MODEL_ARTIFACTS_MANIFEST_URL = "https://raw.githubusercontent.com/royayushkr/Youtube-IP-V4/main/data/model_manifests/bertopic_manifest_2026.03.27.json"
 ```
 
 Single-key fallbacks still work if needed.
@@ -782,7 +825,85 @@ OPENAI_API_KEYS = ["your_openai_key_1", "your_openai_key_2"]
 GOOGLE_OAUTH_CLIENT_ID = "your-google-oauth-client-id"
 GOOGLE_OAUTH_CLIENT_SECRET = "your-google-oauth-client-secret"
 GOOGLE_OAUTH_REDIRECT_URI = "http://localhost:8501/"
+
+# Optional BERTopic beta settings
+# MODEL_ARTIFACTS_ENABLED = true
+# MODEL_ARTIFACTS_MANIFEST_URL = "https://raw.githubusercontent.com/royayushkr/Youtube-IP-V4/main/data/model_manifests/bertopic_manifest_2026.03.27.json"
 ```
+
+### Optional BERTopic Beta For Channel Insights
+
+`Channel Insights` now supports two topic modes:
+
+- `Heuristic Topics`
+- `Model-Backed Topics (Beta)`
+
+The beta mode is deployment-safe by design:
+
+- it is off by default
+- it uses an external manifest and GitHub Release asset instead of Git LFS or repo-committed model binaries
+- it downloads the bundle only when a user explicitly requests the beta mode during a refresh
+- it falls back to heuristic topics if the manifest, download, checksum, load, or transform step fails
+
+#### Required optional settings
+
+- `MODEL_ARTIFACTS_ENABLED=true`
+- `MODEL_ARTIFACTS_MANIFEST_URL=https://.../bertopic_manifest_<version>.json`
+
+#### Optional advanced settings
+
+- `MODEL_ARTIFACTS_CACHE_DIR`
+- `MODEL_ARTIFACTS_DOWNLOAD_TIMEOUT_SECONDS`
+- `MODEL_ARTIFACTS_MAX_SIZE_MB`
+
+#### Manifest schema
+
+The BERTopic manifest must contain:
+
+- `bundle_version`
+- `artifact_url`
+- `sha256`
+- `size_bytes`
+- `model_type` (`bertopic_global`)
+- `bertopic_version`
+- `python_version`
+- `load_subpath`
+
+#### Maintainer packaging workflow
+
+Use the release packaging script:
+
+The current starter manifest in this repo lives at:
+
+- `data/model_manifests/bertopic_manifest_2026.03.27.json`
+
+That manifest currently points at the public BERTopic artifact served from:
+
+- `https://github.com/matt-foor/purdue-youtube-ip/raw/asher/outputs/models/bertopic_model`
+
+If you want to replace that with your own hosted bundle later, the maintainer packaging script is:
+
+```bash
+python3 scripts/package_bertopic_release.py \
+  --model-path /path/to/bertopic_model.pkl \
+  --output-dir dist/bertopic_release \
+  --bundle-version 2026.03.27 \
+  --bertopic-version 0.16.4 \
+  --repo royayushkr/Youtube-IP-V4 \
+  --tag v0.1.0-beta \
+  --github-token "$GITHUB_TOKEN"
+```
+
+The script:
+
+- packages the local BERTopic artifact into a zip bundle
+- verifies the bundle with `BERTopic.load(...)` unless `--skip-verify` is used
+- writes a checksum-based manifest JSON
+- uploads the bundle and manifest to the selected GitHub Release when repo/tag/token are supplied
+
+Important rule:
+
+- do not enable deployed BERTopic inference until the packaged bundle loads cleanly in a fresh environment without relying on hidden local caches or surprise model downloads
 
 ### Theme
 
