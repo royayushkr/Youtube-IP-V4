@@ -30,14 +30,30 @@ flowchart TD
     A --> J["Channel Analysis / Recommendations"]
     G --> K["Ytuber / Channel Insights / Outlier Finder / Tools"]
     H --> L["Recommendations / Ytuber / Outlier Finder / Assistant"]
-    I --> M["Channel Insights owner overlays"]
 
-    J --> N["pandas transforms + service payloads"]
-    K --> N
-    L --> N
-    M --> N
+    J --> M["pandas transforms + service payloads"]
+    K --> M
+    L --> M
 
-    N --> P["dashboard/components/visualizations.py"]
+    K --> N["Channel Insights service path"]
+    N --> N1["load_public_channel_workspace(...)"]
+    N1 --> N2["ensure_public_channel_frame(...)"]
+    N2 --> N3["add_channel_video_features(...)"]
+    N3 --> N4["_apply_requested_topic_mode(...)"]
+    N4 --> N5["assign_topic_labels(...)"]
+    N4 --> N6["apply_optional_topic_model(...)"]
+    N6 -->|failure| N5
+    N5 --> N7["primary_topic + topic_labels + topic_source"]
+    N6 --> N7
+    O --> N8["fetch_owner_channel_analytics(...) + _merge_owner_video_metrics(...)"]
+    N7 --> N8
+    N7 --> N9["_score_videos(...)"]
+    N8 --> N9
+    N9 --> N10["topic / duration / title / timing metrics"]
+    N10 --> N11["summary + outliers + recommendations + snapshots"]
+
+    M --> P["dashboard/components/visualizations.py"]
+    N11 --> P
     P --> Q["Charts, cards, tables, downloads, AI outputs"]
 ```
 
@@ -73,6 +89,60 @@ flowchart LR
 
 In V4, `Channel Insights` may merge owner-only metrics only when Google OAuth is configured and the signed-in Google account owns the tracked channel.
 
+## Channel Insights Topic Integration
+
+The base `Channel Insights` dataframe is built the same way regardless of topic mode:
+
+1. `load_public_channel_workspace(...)`
+2. `ensure_public_channel_frame(...)`
+3. `add_channel_video_features(...)`
+4. `_apply_requested_topic_mode(...)`
+
+After that, both topic modes feed the same downstream metrics, scoring, outlier detection, idea generation, and snapshot persistence.
+
+```mermaid
+flowchart TD
+    A["dashboard/views/channel_insights.py"] --> B["refresh_channel_insights(...)"]
+    B --> C["load_public_channel_workspace(...)"]
+    C --> D["ensure_public_channel_frame(...)"]
+    D --> E["add_channel_video_features(...)"]
+    E --> F["_apply_requested_topic_mode(...)"]
+    F --> G["assign_topic_labels(...)"]
+    F --> H["apply_optional_topic_model(...)"]
+    H -->|failure| G
+    G --> I["primary_topic + topic_labels + topic_source='heuristic'"]
+    H --> J["model_topic_id + model_topic_label_raw + model_topic_label"]
+    J --> K["primary_topic + topic_labels + topic_source='bertopic_global'"]
+    I --> L["optional owner overlay in V4"]
+    K --> L
+    I --> M["_score_videos(...)"]
+    L --> M
+    M --> N["build_topic_metrics(...)"]
+    M --> O["build_duration_metrics(...)"]
+    M --> P["build_title_pattern_metrics(...)"]
+    M --> Q["build_publish_day_metrics(...) + build_publish_hour_metrics(...)"]
+    N --> R["_outlier_and_underperformer_tables(...)"]
+    O --> S["_build_summary(...)"]
+    P --> S
+    Q --> S
+    R --> T["build_grounded_idea_bundle(...) + maybe_generate_ai_overlay(...)"]
+    S --> U["store_channel_snapshot(...)"]
+    T --> U
+    U --> V["Overview / Topic Trends / Formats / Outliers / Next Topics / History"]
+```
+
+### Topic Outputs That Persist
+
+- `primary_topic` is the row-level theme key used in topic metrics and UI explanations.
+- `topic_labels` stores the per-video label list used for grouping and later inspection.
+- `topic_source` records whether the row came from heuristics or BERTopic beta.
+- summary JSON and insight payloads persist:
+  - `topic_mode_requested`
+  - `topic_mode_used`
+  - `topic_model_status`
+  - `topic_model_bundle_version`
+  - `topic_model_failure_reason`
+
 ## Model-Backed Topic Flow
 
 ```mermaid
@@ -95,6 +165,36 @@ Topic modes:
 
 - `Heuristic Topics` uses built-in keyword and rule grouping
 - `Model-Backed Topics` uses optional BERTopic semantic grouping
+
+### Heuristic Topic Derivation
+
+```mermaid
+flowchart LR
+    A["video_title + video_tags + short video_description excerpt"] --> B["tokenize_topic_text(...)"]
+    B --> C["normalize_topic_token(...)"]
+    C --> D["drop stopwords + short tokens"]
+    D --> E["weight tokens using log1p(views_per_day + 1)"]
+    E --> F["build top token pool"]
+    F --> G["assign topic_labels"]
+    G --> H["set primary_topic from first label"]
+```
+
+### BERTopic Beta Preprocessing
+
+```mermaid
+flowchart LR
+    A["video_title"] --> B["duplicate title"]
+    C["video_description"] --> D["strip boilerplate + truncate"]
+    E["video_tags"] --> F["normalize tags"]
+    B --> G["build_bertopic_inference_text(...)"]
+    D --> G
+    F --> G
+    G --> H["remove standalone digits"]
+    H --> I["compute bertopic_token_count"]
+    I --> J["flag is_sparse_text"]
+    J --> K["BERTopic transform(...)"]
+    K --> L["model_topic_id + raw label + human label + topic_source"]
+```
 
 ## Branch Notes
 

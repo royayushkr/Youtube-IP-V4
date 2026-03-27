@@ -56,25 +56,73 @@ flowchart LR
 
 ## Model-Backed Topic Deployment
 
+The deploy-time settings only enable the beta path. The normal `Channel Insights` pipeline still starts with the public workspace and branches inside `_apply_requested_topic_mode(...)`.
+
+### Channel Insights Topic Pipeline
+
 ```mermaid
-flowchart LR
-    A["MODEL_ARTIFACTS_ENABLED"] --> B["Channel Insights beta mode allowed"]
-    C["MODEL_ARTIFACTS_MANIFEST_URL"] --> D["model_artifact_service.py"]
-    D --> E["Manifest JSON in deploy repo"]
-    E --> F["artifact_url + sha256 + bundle_version"]
-    F --> G["Download only on explicit beta refresh"]
-    G --> H["outputs/models/runtime/<bundle_version>/"]
-    H --> I["topic_model_runtime.py loads bundle"]
-    I --> J["channel_insights_service.py assigns topics"]
-    J --> K["Channel Insights UI and snapshots"]
-    D --> L["Fallback to heuristic topics"]
-    L --> J
+flowchart TD
+    A["Channel Insights UI"] --> B["refresh_channel_insights(...)"]
+    B --> C["load_public_channel_workspace(...)"]
+    C --> D["ensure_public_channel_frame(...)"]
+    D --> E["add_channel_video_features(...)"]
+    E --> F["_apply_requested_topic_mode(...)"]
+    F --> G["assign_topic_labels(...)"]
+    F --> H["apply_optional_topic_model(...)"]
+    H -->|failure| G
+    G --> I["heuristic primary_topic + topic_labels + topic_source"]
+    H --> J["model_topic_id + model_topic_label_raw + model_topic_label"]
+    J --> K["model-backed primary_topic + topic_labels + topic_source"]
+    I --> L["optional owner overlay in V4"]
+    K --> L
+    I --> M["_score_videos(...)"]
+    L --> M
+    M --> N["topic / duration / title / timing metrics"]
+    N --> O["outliers + recommendations + summary payload"]
+    O --> P["store_channel_snapshot(...)"]
+    P --> Q["Overview / Topic Trends / Formats / Outliers / Next Topics / History"]
 ```
 
 ### Topic Mode Explanation
 
-- `Heuristic Topics` = built-in keyword and rule grouping
+- `Heuristic Topics` = built-in token and rule grouping from title, tags, and a description excerpt
 - `Model-Backed Topics` = optional BERTopic semantic grouping loaded from the external artifact path
+
+### Heuristic Topic Derivation
+
+```mermaid
+flowchart LR
+    A["title + tags + short description excerpt"] --> B["tokenize_topic_text(...)"]
+    B --> C["normalize_topic_token(...)"]
+    C --> D["drop stopwords + short tokens"]
+    D --> E["weight by log1p(views_per_day + 1)"]
+    E --> F["build top token pool"]
+    F --> G["assign topic_labels and primary_topic"]
+```
+
+### BERTopic Beta Preprocessing And Artifact Flow
+
+```mermaid
+flowchart LR
+    A["MODEL_ARTIFACTS_ENABLED"] --> B["beta mode can be requested"]
+    C["MODEL_ARTIFACTS_MANIFEST_URL"] --> D["model_artifact_service.py"]
+    D --> E["Manifest JSON"]
+    E --> F["artifact_url + sha256 + bundle_version"]
+    F --> G["download only on explicit beta refresh"]
+    G --> H["outputs/models/runtime/<bundle_version>/"]
+    H --> I["topic_model_runtime.py"]
+    I --> J["build_bertopic_inference_text(...)"]
+    J --> K["duplicate title"]
+    J --> L["strip boilerplate description"]
+    J --> M["normalize tags"]
+    K --> N["remove standalone digits"]
+    L --> N
+    M --> N
+    N --> O["bertopic_token_count + is_sparse_text"]
+    O --> P["BERTopic transform(...)"]
+    P --> Q["model_topic_id + raw label + human label + topic_source"]
+    D --> R["fallback to heuristics if artifact is missing or invalid"]
+```
 
 ### Streamlit Secrets Block
 

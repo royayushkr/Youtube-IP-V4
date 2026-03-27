@@ -46,25 +46,41 @@ flowchart TD
     U["User actions in Streamlit"] --> B
     B --> C["dashboard/app.py router"]
     C --> D["dashboard/components/sidebar.py"]
-    D --> E["Page views"]
+    D --> E["Channel Analysis / Channel Insights / Recommendations / Outlier Finder / Ytuber / Tools / Deployment"]
 
     S["Streamlit secrets / env vars"] --> F["src/utils/api_keys.py"]
     F --> G["YouTube Data API v3"]
     F --> H["Gemini / OpenAI"]
     O["Google OAuth + YouTube Analytics"] --> I["Owner analytics services"]
 
-    A --> J["Channel Analysis + Recommendations"]
-    G --> K["Ytuber / Channel Insights / Outlier Finder / Tools"]
+    A --> J["Channel Analysis + Recommendations dataset flows"]
+    G --> K["Ytuber / Channel Insights / Outlier Finder / Tools live API flows"]
     H --> L["Thumbnail generation, AI reports, AI Studio, Assistant"]
-    I --> M["Channel Insights owner overlays"]
 
-    J --> N["pandas transforms + visualization helpers"]
-    K --> N
-    L --> N
-    M --> N
+    J --> M["pandas transforms + visualization helpers"]
+    K --> M
+    L --> M
 
-    N --> P["Tables, charts, cards, downloads, prompts"]
-    P --> Q["Rendered Streamlit UI"]
+    K --> N["Channel Insights internal pipeline"]
+    N --> N1["load_public_channel_workspace(...)"]
+    N1 --> N2["ensure_public_channel_frame(...)"]
+    N2 --> N3["add_channel_video_features(...)"]
+    N3 --> N4["_apply_requested_topic_mode(...)"]
+    N4 --> N5["assign_topic_labels(...)"]
+    N4 --> N6["apply_optional_topic_model(...)"]
+    N6 -->|failure| N5
+    N5 --> N7["primary_topic + topic_labels + topic_source"]
+    N6 --> N7
+    O --> N8["fetch_owner_channel_analytics(...) + _merge_owner_video_metrics(...)"]
+    N7 --> N8
+    N7 --> N9["_score_videos(...)"]
+    N8 --> N9
+    N9 --> N10["topic / duration / title / timing metrics"]
+    N10 --> N11["outliers + recommendations + snapshot payload"]
+    N11 --> Q["Rendered Streamlit UI"]
+
+    M --> P["Tables, charts, cards, downloads, prompts"]
+    P --> Q
 ```
 
 ## Live API Extraction Flow
@@ -85,6 +101,94 @@ flowchart LR
 ```
 
 In V4, `Channel Insights` can optionally merge owner-only analytics when Google OAuth is configured and the signed-in Google account actually owns the tracked channel.
+
+## How Channel Insights Topic Modes Are Integrated
+
+`Channel Insights` always starts with the same public-channel workspace. The split between `Heuristic Topics` and `Model-Backed Topics (Beta)` happens only after `add_channel_video_features(...)` has created the base feature frame.
+
+```mermaid
+flowchart TD
+    A["Channel Insights UI"] --> B["refresh_channel_insights(...)"]
+    B --> C["load_public_channel_workspace(...)"]
+    C --> D["ensure_public_channel_frame(...)"]
+    D --> E["add_channel_video_features(...)"]
+    E --> F["_apply_requested_topic_mode(...)"]
+    F --> G["assign_topic_labels(...)"]
+    F --> H["apply_optional_topic_model(...)"]
+    H -->|artifact missing / invalid / load failed / transform failed| G
+    G --> I["primary_topic + topic_labels + topic_source='heuristic'"]
+    H --> J["model_topic_id + model_topic_label_raw + model_topic_label"]
+    J --> K["primary_topic + topic_labels + topic_source='bertopic_global'"]
+    I --> L["optional owner overlay in V4"]
+    K --> L
+    I --> M["_score_videos(...)"]
+    L --> M
+    M --> N["build_topic_metrics(...)"]
+    M --> O["build_duration_metrics(...)"]
+    M --> P["build_title_pattern_metrics(...)"]
+    M --> Q["build_publish_day_metrics(...) + build_publish_hour_metrics(...)"]
+    N --> R["_outlier_and_underperformer_tables(...)"]
+    O --> S["_build_summary(...)"]
+    P --> S
+    Q --> S
+    R --> T["build_grounded_idea_bundle(...) + maybe_generate_ai_overlay(...)"]
+    S --> U["store_channel_snapshot(...)"]
+    T --> U
+    U --> V["Overview / Topic Trends / Formats / Outliers / Next Topics / History tabs"]
+```
+
+The important piece is that heuristic and beta are not two separate products. They are two topic-assignment modes inside the same refresh path. Once the dataframe has `primary_topic`, `topic_labels`, and `topic_source`, the downstream metrics, summaries, recommendations, and tabs are shared.
+
+### What The Topic Labels Feed
+
+- `primary_topic` becomes the grouping key for `build_topic_metrics(...)`.
+- `topic_labels` and `topic_source` stay attached to each video row and are persisted in the snapshot payload.
+- duration, title-pattern, publish-day, and publish-hour metrics are built from the same enriched dataframe after topic assignment.
+- outlier and underperformer tables use `performance_score`, but the explanation strings shown in the UI use `primary_topic`.
+- next-topic recommendations and the optional AI overlay run after the metric tables exist, so both topic modes feed the same downstream recommendation layer.
+
+### Heuristic Vs Model-Backed Topics
+
+- `Heuristic Topics`
+  - tokenizes the title, tags, and a description excerpt
+  - normalizes tokens and filters stopwords / weak tokens
+  - weights tokens using a log-scaled `views_per_day` signal
+  - is always available and stays the default
+- `Model-Backed Topics (Beta)`
+  - preprocesses text for BERTopic inference
+  - requires the manifest plus the external model bundle
+  - only runs when the user explicitly requests beta mode
+  - falls back to heuristics on any artifact, load, or transform failure
+
+### Heuristic Topic Derivation
+
+```mermaid
+flowchart LR
+    A["video_title + video_tags + first 180 chars of video_description"] --> B["tokenize_topic_text(...)"]
+    B --> C["normalize_topic_token(...)"]
+    C --> D["remove stopwords + short tokens + punctuation noise"]
+    D --> E["weight tokens with log1p(views_per_day + 1)"]
+    E --> F["build top topic token pool"]
+    F --> G["assign up to 2 topic_labels per video"]
+    G --> H["set primary_topic from first label"]
+```
+
+### BERTopic Beta Preprocessing
+
+```mermaid
+flowchart LR
+    A["video_title"] --> B["title duplicated"]
+    C["video_description"] --> D["strip boilerplate + truncate to 600 chars"]
+    E["video_tags"] --> F["normalize tags"]
+    B --> G["build_bertopic_inference_text(...)"]
+    D --> G
+    F --> G
+    G --> H["remove standalone digits"]
+    H --> I["compute bertopic_token_count"]
+    I --> J["flag is_sparse_text when token count is low"]
+    J --> K["BERTopic transform(...)"]
+    K --> L["model_topic_id + model_topic_label_raw + model_topic_label + topic_source"]
+```
 
 ## Model-Backed Topics In Channel Insights
 
