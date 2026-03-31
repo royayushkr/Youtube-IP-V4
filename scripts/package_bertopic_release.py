@@ -8,12 +8,13 @@ import mimetypes
 import os
 import shutil
 import sys
-import tempfile
 import zipfile
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 import requests
+
+from src.utils.bertopic_compat import load_bertopic_with_cpu_fallback
 
 
 def _sha256(path: Path) -> str:
@@ -24,6 +25,17 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _archive_path(archive: zipfile.ZipFile, source_path: Path, archive_root: str) -> None:
+    if source_path.is_file():
+        archive.write(source_path, arcname=archive_root)
+        return
+
+    for child in sorted(source_path.rglob("*")):
+        if child.is_dir():
+            continue
+        archive.write(child, arcname=f"{archive_root}/{child.relative_to(source_path).as_posix()}")
+
+
 def _build_bundle(model_path: Path, output_dir: Path, bundle_version: str) -> tuple[Path, str]:
     output_dir.mkdir(parents=True, exist_ok=True)
     bundle_name = f"bertopic_bundle_{bundle_version}.zip"
@@ -31,12 +43,14 @@ def _build_bundle(model_path: Path, output_dir: Path, bundle_version: str) -> tu
     load_subpath = f"bundle/{model_path.name}"
 
     with zipfile.ZipFile(bundle_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        archive.write(model_path, arcname=load_subpath)
+        _archive_path(archive, model_path, load_subpath)
     return bundle_path, load_subpath
 
 
 def _verify_bundle(bundle_path: Path, load_subpath: str) -> None:
-    with tempfile.TemporaryDirectory(prefix="bertopic_bundle_verify_") as temp_dir_str:
+    from tempfile import TemporaryDirectory
+
+    with TemporaryDirectory(prefix="bertopic_bundle_verify_") as temp_dir_str:
         temp_dir = Path(temp_dir_str)
         with zipfile.ZipFile(bundle_path, "r") as archive:
             archive.extractall(temp_dir)
@@ -47,6 +61,49 @@ def _verify_bundle(bundle_path: Path, load_subpath: str) -> None:
         from bertopic import BERTopic
 
         BERTopic.load(str(model_path))
+
+
+def _resolve_embedding_model_reference(topic_model: Any, explicit_value: str = "") -> str:
+    if explicit_value.strip():
+        return explicit_value.strip()
+
+    embedding_model = getattr(topic_model, "embedding_model", None)
+    candidates = [
+        getattr(embedding_model, "_hf_model", None),
+        getattr(embedding_model, "model_id", None),
+        getattr(embedding_model, "model_name", None),
+        getattr(getattr(embedding_model, "embedding_model", None), "name_or_path", None),
+        getattr(getattr(embedding_model, "embedding_model", None), "_name_or_path", None),
+    ]
+    for candidate in candidates:
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate.strip()
+    return ""
+
+
+def _normalize_model_to_pytorch_directory(
+    model_path: Path,
+    output_dir: Path,
+    bundle_version: str,
+    embedding_model: str = "",
+) -> Path:
+    normalized_root = output_dir / f"normalized_{bundle_version}"
+    normalized_dir = normalized_root / "bertopic_model"
+    if normalized_root.exists():
+        shutil.rmtree(normalized_root)
+    normalized_dir.parent.mkdir(parents=True, exist_ok=True)
+
+    topic_model = load_bertopic_with_cpu_fallback(str(model_path))
+    save_kwargs: Dict[str, Any] = {
+        "serialization": "pytorch",
+        "save_ctfidf": True,
+    }
+    embedding_model_ref = _resolve_embedding_model_reference(topic_model, embedding_model)
+    if embedding_model_ref:
+        save_kwargs["save_embedding_model"] = embedding_model_ref
+
+    topic_model.save(str(normalized_dir), **save_kwargs)
+    return normalized_dir
 
 
 def _release_asset_url(repo: str, tag: str, asset_name: str) -> str:
@@ -145,6 +202,16 @@ def main() -> int:
     parser.add_argument("--tag", help="Git tag / release tag to publish assets under.")
     parser.add_argument("--github-token", default=os.getenv("GITHUB_TOKEN", ""), help="GitHub token with release upload access.")
     parser.add_argument("--skip-verify", action="store_true", help="Skip local BERTopic.load verification of the packaged bundle.")
+    parser.add_argument(
+        "--skip-normalize",
+        action="store_true",
+        help="Package the input artifact as-is instead of converting a pickle-based model to a CPU-safe BERTopic pytorch directory first.",
+    )
+    parser.add_argument(
+        "--embedding-model",
+        default="",
+        help="Optional Hugging Face / sentence-transformers identifier to preserve when normalizing the BERTopic model.",
+    )
     args = parser.parse_args()
 
     model_path = Path(args.model_path).expanduser().resolve()
@@ -152,7 +219,16 @@ def main() -> int:
         raise SystemExit(f"Model path does not exist: {model_path}")
 
     output_dir = Path(args.output_dir).expanduser().resolve()
-    bundle_path, load_subpath = _build_bundle(model_path, output_dir, args.bundle_version)
+    package_source = model_path
+    if not args.skip_normalize and model_path.is_file():
+        package_source = _normalize_model_to_pytorch_directory(
+            model_path,
+            output_dir,
+            args.bundle_version,
+            embedding_model=args.embedding_model,
+        )
+
+    bundle_path, load_subpath = _build_bundle(package_source, output_dir, args.bundle_version)
 
     if not args.skip_verify:
         _verify_bundle(bundle_path, load_subpath)
