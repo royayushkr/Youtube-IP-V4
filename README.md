@@ -218,6 +218,8 @@ Current V4 manifest URL:
 
 - `https://raw.githubusercontent.com/royayushkr/Youtube-IP-V4/main/data/model_manifests/bertopic_manifest_2026.03.27.json`
 
+The tracked manifest now resolves to a CPU-safe BERTopic directory bundle (`bundle_version = 2026.03.31-cpu`). Existing Streamlit secrets do not need to change; the new bundle version forces the app to bypass the stale cached pickle and download the portable artifact instead.
+
 ## Streamlit Secrets
 
 ```toml

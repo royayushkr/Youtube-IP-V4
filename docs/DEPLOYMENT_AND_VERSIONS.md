@@ -142,6 +142,8 @@ MODEL_ARTIFACTS_DOWNLOAD_TIMEOUT_SECONDS = 300
 MODEL_ARTIFACTS_MAX_SIZE_MB = 512
 ```
 
+The tracked manifest path stays the same across deploys, but the current manifest content points at a CPU-safe BERTopic bundle (`bundle_version = 2026.03.31-cpu`). That version bump is what causes Streamlit to ignore older cached pickle artifacts and fetch the new portable bundle automatically.
+
 ## V4 Vs V5
 
 | Area | V4 (`youtube-ip-v4`) | V5 (`youtube-ip-v5`) |
