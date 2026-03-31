@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from types import ModuleType
 from types import SimpleNamespace
 
 import pandas as pd
@@ -139,3 +140,56 @@ def test_load_bertopic_with_cpu_fallback_surfaces_actionable_error(monkeypatch) 
         assert _FailingBERTopic.attempts == 2
     else:
         raise AssertionError("Expected a CPU-safe artifact guidance error when both BERTopic load attempts fail.")
+
+
+def test_load_bertopic_with_cpu_fallback_adds_transformers_alias(monkeypatch) -> None:
+    modeling_bert = ModuleType("transformers.models.bert.modeling_bert")
+    tokenization_bert = ModuleType("transformers.models.bert.tokenization_bert")
+
+    class _BertSelfAttention:
+        pass
+
+    class _BertAttention:
+        pass
+
+    class _BertTokenizer:
+        pass
+
+    modeling_bert.BertSelfAttention = _BertSelfAttention
+    modeling_bert.BertAttention = _BertAttention
+    tokenization_bert.BertTokenizer = _BertTokenizer
+
+    transformers_pkg = ModuleType("transformers")
+    transformers_models_pkg = ModuleType("transformers.models")
+    transformers_bert_pkg = ModuleType("transformers.models.bert")
+    transformers_bert_pkg.modeling_bert = modeling_bert
+    transformers_bert_pkg.tokenization_bert = tokenization_bert
+    transformers_models_pkg.bert = transformers_bert_pkg
+    transformers_pkg.models = transformers_models_pkg
+
+    monkeypatch.setitem(sys.modules, "transformers", transformers_pkg)
+    monkeypatch.setitem(sys.modules, "transformers.models", transformers_models_pkg)
+    monkeypatch.setitem(sys.modules, "transformers.models.bert", transformers_bert_pkg)
+    monkeypatch.setitem(sys.modules, "transformers.models.bert.modeling_bert", modeling_bert)
+    monkeypatch.setitem(sys.modules, "transformers.models.bert.tokenization_bert", tokenization_bert)
+
+    class _FakeBERTopic:
+        @classmethod
+        def load(cls, _model_path: str):
+            import importlib
+
+            assert modeling_bert.BertSdpaSelfAttention is _BertSelfAttention
+            assert modeling_bert.BertSdpaAttention is _BertAttention
+            tokenization_fast = importlib.import_module("transformers.models.bert.tokenization_bert_fast")
+            assert tokenization_fast.BertTokenizerFast is _BertTokenizer
+            assert tokenization_fast.BertTokenizer is _BertTokenizer
+            return {"ok": True}
+
+    monkeypatch.setitem(sys.modules, "bertopic", SimpleNamespace(BERTopic=_FakeBERTopic))
+
+    result = load_bertopic_with_cpu_fallback("/tmp/bertopic_model")
+
+    assert result == {"ok": True}
+    assert not hasattr(modeling_bert, "BertSdpaSelfAttention")
+    assert not hasattr(modeling_bert, "BertSdpaAttention")
+    assert "transformers.models.bert.tokenization_bert_fast" not in sys.modules
